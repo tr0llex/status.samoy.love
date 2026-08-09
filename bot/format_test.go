@@ -967,6 +967,25 @@ func TestЧислоЦелейВСообщенииОграничено(t *testing
 	}
 }
 
+func TestПродВсегдаПервымНезависимоОтПорядкаВыкатки(t *testing.T) {
+	// Nightly едет первым по построению выкатки (docs/DEPLOY.md), и его успех
+	// доезжает до бота раньше прода. Раньше карточка печатала цели в порядке
+	// прихода — прод оказывался в ней вторым всегда. Прод узнаётся по тому же
+	// правилу, что и во всём хозяйстве: APP совпадает с id проекта.
+	nightly := Deploy{
+		Kind: deploySuccess, App: "die-dev", Project: "die", Title: "Double or Die · Nightly",
+		URL: "https://dev.die.samoy.love/", Version: "release-1", At: base,
+	}
+	prod := Deploy{
+		Kind: deploySuccess, App: "die", Project: "die", Title: "Double or Die",
+		URL: "https://die.samoy.love/", Version: "release-1", At: base.Add(time.Minute),
+	}
+	got := formatDeployGroup("Double or Die", []Deploy{nightly, prod})
+	if i, j := strings.Index(got, "Double or Die<"), strings.Index(got, "Nightly<"); i == -1 || j == -1 || i > j {
+		t.Errorf("прод не первым в карточке прогона:\n%s", got)
+	}
+}
+
 // ---------------------------------------------------------------------- ИБ
 
 func TestСсылкойСтановитсяТолькоРазрешённыйАдрес(t *testing.T) {
