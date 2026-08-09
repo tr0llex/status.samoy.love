@@ -203,6 +203,21 @@ func TestFormatEvent(t *testing.T) {
 			},
 			[]string{"обновлён", "v2", "была", "v1", "собрано"},
 		},
+		{
+			"релиз с ручным переключением",
+			Event{
+				Kind: KindRelease, Title: "ChillHub · Установщик", Version: "1.3.5",
+				At: base, AdminURL: "https://launcher.samoy.love/admin/ui/admin.html#launcher",
+			},
+			[]string{"обновлён", "переключить", "https://launcher.samoy.love/admin/ui/admin.html#launcher"},
+		},
+		{
+			"релиз без ручного переключения не показывает ссылку",
+			Event{
+				Kind: KindRelease, Title: "ChillHub · Сайт", Version: "v3", At: base,
+			},
+			[]string{"обновлён"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -850,6 +865,45 @@ func TestОдиночнаяЦельДаётПрежнююФормуРелиза(
 		if strings.Contains(got, trace) {
 			t.Errorf("в одиночном сообщении остался след группировки (%q):\n%s", trace, got)
 		}
+	}
+}
+
+func TestУстановщикЗоветВАдминкуПереключитьВерсию(t *testing.T) {
+	// publish-file.sh кладёт сборку на сервер, но канал самообновления не
+	// переключает — это решение человека (см. deployAdminLinks). Без прямой
+	// ссылки релиз в чате выглядит завершённым, а переключатель ждёт в другой
+	// вкладке, о которой напоминает только память.
+	d := deployOf(deploySuccess)
+	d.App = "chillhub-installer"
+	got := formatDeploy(d)
+	if !strings.Contains(got, "переключить") || !strings.Contains(got, deployAdminLinks["chillhub-installer"]) {
+		t.Errorf("нет ссылки на переключение канала:\n%s", got)
+	}
+}
+
+func TestОбычныйРелизНеЗовётВАдминку(t *testing.T) {
+	// У целей без записи в deployAdminLinks (подавляющее большинство) ничего
+	// переключать не нужно, и сообщение обязано остаться прежним — без лишней
+	// строки, которая для них ничего не значит.
+	got := formatDeploy(deployOf(deploySuccess))
+	if strings.Contains(got, "переключить") {
+		t.Errorf("лишняя ссылка на переключение у цели без ручного шага:\n%s", got)
+	}
+}
+
+func TestУстановщикВГрупповомСообщенииТожеЗовётВАдминку(t *testing.T) {
+	// Та же ссылка обязана появиться и когда установщик приехал в одном
+	// прогоне с другими целями (обычный случай chillhub — installer едет
+	// вместе с site/api/admin/admin-ui), а не только в одиночном сообщении.
+	installer := deployOf(deploySuccess)
+	installer.App = "chillhub-installer"
+	installer.Title = "Установщик"
+	site := deployOf(deploySuccess)
+	site.App = "chillhub-site"
+	site.Title = "Сайт"
+	got := formatDeployGroup("ChillHub", []Deploy{site, installer})
+	if !strings.Contains(got, "переключить") || !strings.Contains(got, deployAdminLinks["chillhub-installer"]) {
+		t.Errorf("нет ссылки на переключение канала в групповом сообщении:\n%s", got)
 	}
 }
 
