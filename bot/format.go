@@ -986,9 +986,13 @@ func formatDeployGroup(project string, ds []Deploy) string {
 // deployOutcomes — текущий исход каждой цели прогона.
 //
 // Цель объявляется дважды (started, потом success или failure), и в сообщении
-// ей полагается ОДНА строка. Порядок строк — порядок первого появления цели:
-// он совпадает с порядком выкатки, и строки не прыгают при каждой правке
-// сообщения.
+// ей полагается ОДНА строка. Порядок внутри каждой из двух групп (прод,
+// остальные) — порядок первого появления цели: он совпадает с порядком
+// выкатки, и строки не прыгают при каждой правке сообщения. Между группами
+// порядок фиксирован: прод — то, ради чего читают карточку, — печатается
+// первым и не должен зависеть от того, что в конкретном прогоне отчиталось
+// раньше (nightly едет первым нарочно, см. docs/DEPLOY.md, и без этого
+// правила прод оказывался бы в карточке вторым всегда).
 func deployOutcomes(ds []Deploy) []Deploy {
 	var order []string
 	byApp := map[string]Deploy{}
@@ -1014,8 +1018,18 @@ func deployOutcomes(ds []Deploy) []Deploy {
 	for _, k := range order {
 		out = append(out, byApp[k])
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return isPrimaryTarget(out[i]) && !isPrimaryTarget(out[j])
+	})
 	return out
 }
+
+// isPrimaryTarget — цель того же имени, что и проект (APP совпадает с id
+// проекта в реестре, конвенция всего хозяйства: metro, snakes, samoylove...).
+// Такая цель — прод, а не одна из дополнительных (nightly, editor, admin-ui):
+// вторичные цели именуются с суффиксом («die-dev», «metro-editor») и этому
+// условию не удовлетворяют.
+func isPrimaryTarget(d Deploy) bool { return d.App != "" && d.App == d.Project }
 
 // outcomeText — исход цели строкой в карточке прогона.
 //
