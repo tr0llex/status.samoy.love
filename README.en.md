@@ -50,17 +50,11 @@ branch: a commit per pass would bury the actual code changes in `main`.
 
 **The frequency of that walk is not promised, it is displayed.** The schedule
 asks for a run every five minutes — the finest cron interval GitHub offers —
-but cron there is a request, not an obligation: under load whole batches of
-runs are dropped, and the measured gaps between real runs over a day ranged
-from one hour to three and a half. Nothing can be promised on such a schedule,
-so instead of a frequency the age is computed: the run summary and the message
-of the data commit both say how long the watchdog was away, and a gap longer
-than six hours goes to Telegram as its own message. Without it a silent
-watchdog is indistinguishable from a calm one — the last summary sits in the
-branch looking the same after five minutes and after half a day. The five
-one-minute passes inside a run stayed: a state change is only believed after
-two consecutive passes, and a single point cannot tell a flicker from an
-outage.
+but that is a request, not an obligation: under load runs get dropped, and the
+real gap over a day ranged from one hour to three and a half. So instead of a
+frequency the age is computed: the run summary and the data commit message say
+how long the watchdog was away, and a gap longer than six hours goes to
+Telegram as its own message.
 
 **The agent (`agent/`, Go) lives on the host itself, because otherwise the
 important part is invisible.** Systemd unit states, deployed versions and
@@ -184,18 +178,18 @@ npm run e2e                                              # end-to-end tests
 
 ## Tests
 
-158 Go tests: 69 for the agent (verdicts, outage scale, failure confirmation,
-systemd parsing, uptime windows, the deployment journal, metrics) and 89 for the
+271 Go tests: 98 for the agent (verdicts, outage scale, failure confirmation,
+systemd parsing, uptime windows, the deployment journal, metrics) and 173 for the
 bot (formatting, keyboards, the changelog screen, dead-man switch, Telegram
 delivery). They run with `-race` — both
 services are concurrent, and a race shows up in production at the least
 convenient moment. Coverage goes to Codecov under two flags.
 
-9 Playwright scenarios against a real build of the page. The data is swapped
+8 Playwright scenarios against a real build of the page. The data is swapped
 for sets from `e2e/fixtures/` — waiting for production to break in order to
 learn whether the page survives it is a poor plan. The clock is frozen in the
 tests: the page prints relative time, and without that a test would be green
-today and red tomorrow on its own. Two more scenarios (`npm run e2e:prod`) run
+today and red tomorrow on its own. 4 more scenarios (`npm run e2e:prod`) run
 against the live site by hand and catch a silently dead agent: data older than
 an hour is a red run.
 
