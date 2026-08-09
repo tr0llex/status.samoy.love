@@ -42,6 +42,29 @@ const (
 	ActUnmute = "a:unmute"
 )
 
+// ActWhatNowPrefix — «Что сейчас» на сообщении, которое НЕ является экраном:
+// уведомление о падении, карточка прогона выкатки, подтверждение тишины.
+//
+// Правило владения сообщением: EditLong (перерисовка на месте) годится
+// только для сообщения, которое бот сам нарисовал КАК ЭКРАН, — навигационные
+// Статус/Версии/Инциденты/Изменения/Справка, где кнопки внизу и так листают
+// то же самое сообщение. Уведомление, карточка прогона и подтверждение
+// тишины — это СОБЫТИЯ, а не экраны: их перерисовка стирает саму причину,
+// по которой сообщение в переписке, — текст аварии, кнопки тишины под ним,
+// факт, что цель катилась. Нажатие «Что сейчас» на таком сообщении обязано
+// открыть НОВЫЙ экран, а не заменить собой уже написанное.
+//
+// Префикс, а не своя константа под каждый экран: кнопка ведёт то на общий
+// статус, то на экран конкретного проекта, а заводить под каждый случай
+// отдельные действие и обработчик значило бы дублировать handleCallback ради
+// одной и той же развилки «открыть новым сообщением».
+const ActWhatNowPrefix = "a:now:"
+
+// whatNowButton — «Что сейчас», открывающее view НОВЫМ сообщением.
+func whatNowButton(view string) Button {
+	return Button{Text: "Что сейчас", CallbackData: ActWhatNowPrefix + view}
+}
+
 const (
 	ViewStatus    = "v:status"
 	ViewVersions  = "v:versions"
@@ -256,9 +279,9 @@ func changelogRows(s *Summary, current string) [][]Button {
 // него: иначе владелец попадает на общий экран и ищет там то, о чём ему
 // только что написали.
 func alertKeyboard(projectID string) *Keyboard {
-	what := Button{Text: "Что сейчас", CallbackData: ViewStatus}
+	what := whatNowButton(ViewStatus)
 	if projectID != "" {
-		what.CallbackData = ViewProject + projectID
+		what = whatNowButton(ViewProject + projectID)
 	}
 	return &Keyboard{InlineKeyboard: [][]Button{
 		{what, openButton()},
@@ -270,12 +293,39 @@ func alertKeyboard(projectID string) *Keyboard {
 }
 
 // mutedKeyboard — под подтверждением тишины: единственное осмысленное
-// действие здесь — передумать.
+// действие здесь — передумать; «Что сейчас» открывает статус новым
+// сообщением, не заменяя собой это подтверждение (см. ActWhatNowPrefix).
 func mutedKeyboard() *Keyboard {
 	return &Keyboard{InlineKeyboard: [][]Button{
 		{
 			{Text: "Снова говорить", CallbackData: ActUnmute},
-			{Text: "Что сейчас", CallbackData: ViewStatus},
+			whatNowButton(ViewStatus),
 		},
 	}}
+}
+
+// deployKeyboard — под карточкой прогона выкатки.
+//
+// Кнопок тишины здесь НЕТ, хотя раньше они были — deployKeyboard попросту
+// возвращал alertKeyboard как есть. Тишина глушит ТОЛЬКО напоминания цикла
+// наблюдения (KindStillDown); события выкатки идут через outbox, минуя
+// фильтр тишины, и «До утра» под успешной карточкой не глушит ничего, а под
+// провалившейся не останавливает поток карточек — кнопка врала. Вместо них —
+// «Прогон» (адрес CI, если пришёл и прошёл проверку runURLRe) и «Что
+// менялось» по проекту: то, что под карточкой выкатки действительно имеет
+// смысл.
+func deployKeyboard(projectID, runURL string) *Keyboard {
+	what := whatNowButton(ViewStatus)
+	if projectID != "" {
+		what = whatNowButton(ViewProject + projectID)
+	}
+	row := []Button{what, openButton()}
+	if runURLRe.MatchString(runURL) {
+		row = append(row, Button{Text: "Прогон", URL: runURL})
+	}
+	rows := [][]Button{row}
+	if projectID != "" {
+		rows = append(rows, []Button{{Text: "Что менялось", CallbackData: ViewChangelogOf + projectID}})
+	}
+	return &Keyboard{InlineKeyboard: rows}
 }

@@ -121,7 +121,7 @@ func main() {
 			st.dirty = false
 			return saveGroups(cfg.Groups, store.groups)
 		}, metrics, func(v groupView) string { return renderDeployGroup(summaryPath, v) })
-		sender.keyboard = func(v groupView) *Keyboard { return deployKeyboard(summaryPath, v) }
+		sender.keyboard = func(v groupView) *Keyboard { return deployKeyboardFor(summaryPath, v) }
 		sender.log = log.Printf
 	} else {
 		log.Print("журнал выкаток не читается: EVENTS_DIR выключен")
@@ -575,17 +575,29 @@ func renderDeployGroup(summaryPath string, v groupView) string {
 	return formatDeployGroup(reg.project(ds), ds)
 }
 
-// deployKeyboard — та же клавиатура, что под уведомлением о падении: «что
-// сейчас» по проекту выкатки и кнопка открыть. Своих кнопок у выкатки нет —
-// откат из бота требует прав на прод и решается отдельно.
-func deployKeyboard(summaryPath string, v groupView) *Keyboard {
+// deployKeyboardFor — клавиатура карточки прогона (deployKeyboard,
+// keyboard.go) с проектом и адресом прогона, найденными по её целям.
+//
+// Проект узнаём из реестра summary.json, а не из события: имя проекта в
+// хозяйстве одно (контракт, §4). Адрес прогона одинаков у всех целей одного
+// прогона (один пуш — один CI-run), поэтому годится первый непустой.
+func deployKeyboardFor(summaryPath string, v groupView) *Keyboard {
 	reg := loadRegistry(summaryPath)
+	var projectID string
 	for _, t := range v.Targets {
 		if _, _, project := reg.target(t.App); project != "" {
-			return alertKeyboard(project)
+			projectID = project
+			break
 		}
 	}
-	return alertKeyboard("")
+	var runURL string
+	for _, t := range v.Targets {
+		if t.RunURL != "" {
+			runURL = t.RunURL
+			break
+		}
+	}
+	return deployKeyboard(projectID, runURL)
 }
 
 // registry — реестр проектов из summary.json: по id цели выкатки даёт

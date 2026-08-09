@@ -177,11 +177,11 @@ func TestИсчезнувшийПроектВозвращаетНаСтатус(
 
 func TestКнопкаПодУведомлениемВедётВУпавшийПроект(t *testing.T) {
 	kb := alertKeyboard("metro")
-	if got := kb.InlineKeyboard[0][0].CallbackData; got != ViewProject+"metro" {
+	if got := kb.InlineKeyboard[0][0].CallbackData; got != ActWhatNowPrefix+ViewProject+"metro" {
 		t.Errorf("кнопка ведёт на %q, а не в упавший проект", got)
 	}
 	// Событие без проекта (устаревшие данные агента) — общий экран.
-	if got := alertKeyboard("").InlineKeyboard[0][0].CallbackData; got != ViewStatus {
+	if got := alertKeyboard("").InlineKeyboard[0][0].CallbackData; got != ActWhatNowPrefix+ViewStatus {
 		t.Errorf("без проекта ожидали общий экран, получили %q", got)
 	}
 }

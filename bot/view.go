@@ -109,8 +109,9 @@ func handleCallback(ctx context.Context, tg *Telegram, q *CallbackQuery, owner, 
 		return
 	}
 
-	// Действия обрабатываются отдельно: они меняют состояние, а не экран.
-	if handled := handleAction(ctx, tg, q, owner); handled {
+	// Действия обрабатываются отдельно: они меняют состояние (тишина) или
+	// открывают экран новым сообщением («Что сейчас»), а не листают текущее.
+	if handled := handleAction(ctx, tg, q, owner, summaryPath); handled {
 		return
 	}
 
@@ -133,12 +134,24 @@ func handleCallback(ctx context.Context, tg *Telegram, q *CallbackQuery, owner, 
 	}
 }
 
-// handleAction — нажатия, которые что-то делают, а не листают экраны.
+// handleAction — нажатия, которые что-то делают, а не листают текущий экран.
 //
-// Ответ приходит новым сообщением, а не правкой уведомления: уведомление о
-// падении должно остаться в переписке как было — по нему потом восстанавливают
-// картину. Затирать его подтверждением тишины значит терять историю.
-func handleAction(ctx context.Context, tg *Telegram, q *CallbackQuery, owner int64) bool {
+// Сюда же попадает «Что сейчас» с уведомления, карточки прогона и
+// подтверждения тишины (ActWhatNowPrefix): по правилу владения сообщением
+// (см. комментарий к ActWhatNowPrefix в keyboard.go) такое сообщение — не
+// экран, и его нельзя перерисовывать. Ответ уходит НОВЫМ сообщением, а не
+// правкой: уведомление о падении, карточка выкатки и подтверждение тишины
+// должны остаться в переписке как были — по ним потом восстанавливают
+// картину, и затирать их значит терять историю.
+func handleAction(ctx context.Context, tg *Telegram, q *CallbackQuery, owner int64, summaryPath string) bool {
+	if view, ok := strings.CutPrefix(q.Data, ActWhatNowPrefix); ok {
+		text, kb := renderView(view, summaryPath, time.Now().UTC())
+		if err := tg.SendWith(ctx, q.Message.Chat.ID, text, kb); err != nil {
+			log.Printf("экран %s не открыт новым сообщением: %v", view, err)
+		}
+		return true
+	}
+
 	var d time.Duration
 	switch q.Data {
 	case ActMute2h:
