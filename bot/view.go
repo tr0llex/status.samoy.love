@@ -14,8 +14,6 @@ import (
 
 func viewOf(cmd string) string {
 	switch cmd {
-	case CmdVersions:
-		return ViewVersions
 	case CmdIncidents:
 		return ViewIncidents
 	case CmdChangelog:
@@ -74,8 +72,6 @@ func renderView(view, summaryPath string, now time.Time) (string, *Keyboard) {
 		return statusText(s, now), statusKeyboard(s)
 	}
 	switch view {
-	case ViewVersions:
-		return formatVersions(s, now), versionsKeyboard()
 	case ViewIncidents:
 		return formatIncidents(s, now), navKeyboard(view)
 	case ViewChangelog:
@@ -143,7 +139,7 @@ func handleCallback(ctx context.Context, tg *Telegram, q *CallbackQuery, owner, 
 	_, isService := changelogOfView(view)
 	if !isProject && !isService {
 		switch view {
-		case ViewStatus, ViewVersions, ViewIncidents, ViewChangelog, ViewHelp:
+		case ViewStatus, ViewIncidents, ViewChangelog, ViewHelp:
 		default:
 			// Кнопка из сообщения, отправленного прошлой версией бота.
 			view = ViewStatus

@@ -7,7 +7,6 @@ import "strings"
 const (
 	CmdHelp      = "help"
 	CmdStatus    = "status"
-	CmdVersions  = "versions"
 	CmdIncidents = "incidents"
 	CmdChangelog = "changelog"
 	// CmdQuiet — тишина по требованию, а не только по кнопке под уже
@@ -37,8 +36,6 @@ var aliases = map[string]string{
 	"start":     CmdHelp, // Telegram сам шлёт /start при первом открытии чата
 	"status":    CmdStatus,
 	"s":         CmdStatus,
-	"versions":  CmdVersions,
-	"v":         CmdVersions,
 	"incidents": CmdIncidents,
 	"i":         CmdIncidents,
 	"changelog": CmdChangelog,

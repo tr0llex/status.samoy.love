@@ -41,7 +41,7 @@ func TestFmtTimeMoscow(t *testing.T) {
 
 func TestFormatHelpListsCommands(t *testing.T) {
 	help := formatHelp()
-	for _, cmd := range []string{"/status", "/versions", "/incidents", "/help"} {
+	for _, cmd := range []string{"/status", "/changelog", "/incidents", "/quiet", "/help"} {
 		if !strings.Contains(help, cmd) {
 			t.Errorf("в справке нет %s", cmd)
 		}
@@ -145,31 +145,6 @@ func TestFormatEscapesHTML(t *testing.T) {
 	}
 	if !strings.Contains(got, "A &amp; B") {
 		t.Errorf("амперсанд не экранирован:\n%s", got)
-	}
-}
-
-func TestFormatVersions(t *testing.T) {
-	now := base
-	s := &Summary{
-		Updated: now.Format(time.RFC3339),
-		Projects: []Project{
-			{
-				Title: "Snakes",
-				Builds: []Build{{
-					Title: "Сервер и клиент", Version: "20260802-1200-abc1234",
-					At: now.Add(-3 * time.Hour).Format(time.RFC3339),
-				}},
-			},
-			// Источник версии не настроен — это должно быть видно, а не
-			// выглядеть как пустой проект.
-			{Title: "Метро"},
-		},
-	}
-	got := formatVersions(s, now)
-	for _, want := range []string{"20260802-1200-abc1234", "собрано", "3 ч назад", "не настроен"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("в ответе нет %q:\n%s", want, got)
-		}
 	}
 }
 

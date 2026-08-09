@@ -190,7 +190,6 @@ func formatHelp() string {
 		"",
 		"Если удобнее командами:",
 		"/status — что живо, что лежит, аптайм",
-		"/versions — версии сервисов со временем сборки",
 		"/changelog — что менялось в последних выкатках",
 		"/changelog metro — то же по одному сервису, с историей",
 		"/incidents — последние падения",
@@ -518,31 +517,6 @@ func freshness(s *Summary, now time.Time) string {
 		line += "\n" + degraded + " <b>Данные устарели</b> — похоже, агент не обходит сервисы"
 	}
 	return line
-}
-
-func formatVersions(s *Summary, now time.Time) string {
-	var b strings.Builder
-	b.WriteString("<b>Версии</b>\n")
-	for _, p := range s.Projects {
-		fmt.Fprintf(&b, "\n<b>%s</b>\n", link(p.Title, p.URL))
-		if len(p.Builds) == 0 {
-			b.WriteString("  источник версии не настроен\n")
-			continue
-		}
-		for _, bl := range p.Builds {
-			version := bl.Version
-			if version == "" {
-				version = "неизвестна"
-			}
-			fmt.Fprintf(&b, "  %s: <code>%s</code>", link(bl.Title, bl.URL), esc(version))
-			if t, ok := parseTime(bl.At); ok {
-				fmt.Fprintf(&b, "\n    собрано %s (%s назад)", fmtTime(t), humanDur(now.Sub(t)))
-			}
-			b.WriteString("\n")
-		}
-	}
-	b.WriteString("\n" + freshness(s, now))
-	return b.String()
 }
 
 func formatIncidents(s *Summary, now time.Time) string {

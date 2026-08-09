@@ -47,8 +47,8 @@ const (
 //
 // Правило владения сообщением: EditLong (перерисовка на месте) годится
 // только для сообщения, которое бот сам нарисовал КАК ЭКРАН, — навигационные
-// Статус/Версии/Инциденты/Изменения/Справка, где кнопки внизу и так листают
-// то же самое сообщение. Уведомление, карточка прогона и подтверждение
+// Статус/Инциденты/Изменения/Справка, где кнопки внизу и так листают то же
+// самое сообщение. Уведомление, карточка прогона и подтверждение
 // тишины — это СОБЫТИЯ, а не экраны: их перерисовка стирает саму причину,
 // по которой сообщение в переписке, — текст аварии, кнопки тишины под ним,
 // факт, что цель катилась. Нажатие «Что сейчас» на таком сообщении обязано
@@ -67,7 +67,6 @@ func whatNowButton(view string) Button {
 
 const (
 	ViewStatus    = "v:status"
-	ViewVersions  = "v:versions"
 	ViewIncidents = "v:incidents"
 	ViewHelp      = "v:help"
 	// ViewProject — экран одного проекта, ключ вида "v:p:metro".
@@ -146,7 +145,6 @@ func navRows(current string) [][]Button {
 	return [][]Button{
 		{
 			{Text: mark(ViewStatus, current, "Статус"), CallbackData: ViewStatus},
-			{Text: mark(ViewVersions, current, "Версии"), CallbackData: ViewVersions},
 			{Text: mark(ViewIncidents, current, "Инциденты"), CallbackData: ViewIncidents},
 		},
 		{
@@ -217,16 +215,6 @@ func projectRows(s *Summary, current string) [][]Button {
 		rows = append(rows, row)
 	}
 	return rows
-}
-
-// versionsKeyboard — под экраном версий.
-//
-// Отдельная кнопка нужна ровно из-за порядка вопросов: экран версий отвечает
-// «какая версия сейчас», и следующий вопрос всегда «а что в ней». Без кнопки
-// ответ на него надо набирать командой, а про команду ещё надо знать.
-func versionsKeyboard() *Keyboard {
-	rows := [][]Button{{{Text: "Что менялось", CallbackData: ViewChangelog}}}
-	return &Keyboard{InlineKeyboard: append(rows, navRows(ViewVersions)...)}
 }
 
 // changelogKeyboard — под экраном изменений: ряд проектов, чтобы провалиться
