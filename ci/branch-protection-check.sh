@@ -36,14 +36,28 @@ BASE_BRANCH="${BASE_BRANCH:-main}"
 command -v gh >/dev/null || { echo "нужен gh CLI" >&2; exit 1; }
 command -v jq >/dev/null || { echo "нужен jq" >&2; exit 1; }
 
+# Один снимок Jobs API не гарантирует полноты. GitHub регистрирует задачу с
+# needs только когда та реально стартовала, и даже уже удовлетворённые needs
+# (частичный перезапуск --failed по уже готовым зависимостям) оставляют
+# секундный зазор, пока список догоняет реальность. Опрашиваем, пока два
+# снимка подряд не совпадут — задачи в рамках одного прогона только
+# появляются, никогда не пропадают, так что растущий список рано или поздно
+# стабилизируется, а стабильный дважды подряд — и есть полный.
 echo "текущие задачи прогона ($GITHUB_RUN_ID):"
-current="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
-    -q '.jobs[].name' 2>/tmp/current.err)" || {
-    echo "::error::не удалось получить список задач прогона" >&2
-    cat /tmp/current.err >&2
-    exit 1
-}
-current="$(sort -u <<<"$current")"
+prev=""
+current=""
+for _ in 1 2 3 4 5; do
+    current="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
+        -q '.jobs[].name' 2>/tmp/current.err)" || {
+        echo "::error::не удалось получить список задач прогона" >&2
+        cat /tmp/current.err >&2
+        exit 1
+    }
+    current="$(sort -u <<<"$current")"
+    [[ "$current" == "$prev" ]] && break
+    prev="$current"
+    sleep 3
+done
 sed 's/^/  /' <<<"$current"
 
 echo
