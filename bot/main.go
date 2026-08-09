@@ -82,6 +82,23 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Имя бота нужно, чтобы отличать «/status» от «/status@сосед_по_чату» в
+	// группе. TELEGRAM_BOT_USERNAME остаётся опциональным override (тесты,
+	// узкий случай, когда getMe недоступен); по умолчанию бот спрашивает у
+	// Telegram сам, а не полагается на переменную, забытую в файле окружения.
+	self := cfg.Self
+	if self == "" {
+		if name, err := tg.GetMe(ctx); err != nil {
+			log.Printf("getMe не удался, TELEGRAM_BOT_USERNAME не задан — бот будет отвечать на команды для ЛЮБОГО бота в группе: %v", err)
+		} else {
+			self = name
+		}
+	}
+
+	if err := tg.SetMyCommands(ctx, botCommands()); err != nil {
+		log.Printf("список команд Telegram не обновлён: %v", err)
+	}
+
 	// Проверка канала после выкатки. Молчащий бот неотличим от работающего,
 	// пока что-нибудь не упадёт, — а выяснять это в момент аварии поздно.
 	// Проверка молчалива для владельца, но не для выкатки: её код возврата
@@ -247,7 +264,7 @@ func main() {
 					st.Offset = u.UpdateID + 1
 				}
 				mu.Unlock()
-				handleUpdate(ctx, tg, u, cfg.Owner, cfg.OwnerUser, cfg.Self, summaryPath)
+				handleUpdate(ctx, tg, u, cfg.Owner, cfg.OwnerUser, self, summaryPath)
 			}
 			if len(updates) > 0 {
 				mu.Lock()
@@ -385,7 +402,14 @@ func handleUpdate(ctx context.Context, tg *Telegram, u Update, owner, ownerUser 
 	}
 	cmd := resolveCommand(word)
 	if cmd == "" {
-		if err := tg.SendWith(ctx, owner, "Не знаю такой команды.\n\n"+formatHelp(), navKeyboard(ViewHelp)); err != nil {
+		// Короткий ответ, а не полная справка (20 строк): незнакомая команда
+		// — самый частый случай опечатки, и топить её в справке — не помощь.
+		// Логируется и считается отдельно от команд, которые бот выполнил:
+		// «команда пришла, но бот её не понял» — другая авария, чем «команды
+		// не доходят вовсе».
+		metrics.unknownCommand()
+		log.Printf("неизвестная команда: /%s", logSafe(word))
+		if err := tg.SendWith(ctx, owner, "Не знаю такую команду. /help — список команд.", navKeyboard(ViewHelp)); err != nil {
 			log.Printf("ответ не отправлен: %v", err)
 		}
 		return

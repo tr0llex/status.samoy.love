@@ -465,7 +465,7 @@ func TestКомандаИзмененийОтвечаетВладельцу(t *t
 	path := farmData(t)
 	cases := []struct{ text, want string }{
 		{"/changelog", "Метро · Сайт"},
-		{"/cl", "Snakes · Сервер и клиент"},
+		{"/c", "Snakes · Сервер и клиент"},
 		{"/changelog metro", "перевести карту на новый тайлсет"},
 		{"/changelog нет-такой", "Не знаю цель"},
 	}

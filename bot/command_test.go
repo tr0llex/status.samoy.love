@@ -42,11 +42,18 @@ func TestResolveCommand(t *testing.T) {
 		"i":         CmdIncidents,
 		"incidents": CmdIncidents,
 		"c":         CmdChangelog,
-		"cl":        CmdChangelog,
 		"changelog": CmdChangelog,
-		"changes":   CmdChangelog,
-		"выкатка":   "",
-		"":          "",
+		"q":         CmdQuiet,
+		"quiet":     CmdQuiet,
+		// Псевдонимы, снесённые сведением к одному короткому на команду:
+		// каждой команде положена ровно одна короткая форма, и «cl»/«changes»
+		// у /changelog, «state» у /status и «log» у /incidents были лишними.
+		"cl":      "",
+		"changes": "",
+		"state":   "",
+		"log":     "",
+		"выкатка": "",
+		"":        "",
 	}
 	for word, want := range cases {
 		if got := resolveCommand(word); got != want {

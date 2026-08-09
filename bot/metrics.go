@@ -48,6 +48,7 @@ type botMetrics struct {
 	mu             sync.Mutex
 	notifications  map[string]float64
 	commands       map[string]float64
+	unknownCmds    float64
 	sendFailures   float64
 	pollFailures   float64
 	lastNotifiedAt int64
@@ -160,6 +161,19 @@ func (m *botMetrics) command(name string) {
 	m.mu.Unlock()
 }
 
+// unknownCommand — владелец отправил слово, начинающееся с «/», которое не
+// разрешилось ни в одну команду. Отдельный счётчик, а не общий с command():
+// «команда пришла, но бот её не понял» — другая авария, чем «команды не
+// доходят вовсе», и слитые в одно число они неразличимы на графике.
+func (m *botMetrics) unknownCommand() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	m.unknownCmds++
+	m.mu.Unlock()
+}
+
 // pollFailed — не удался длинный опрос Telegram.
 func (m *botMetrics) pollFailed() {
 	if m == nil {
@@ -180,6 +194,7 @@ func (m *botMetrics) render(now time.Time) string {
 	notifications := copyCounts(m.notifications)
 	commands := copyCounts(m.commands)
 	eventsDropped := copyCounts(m.eventsDropped)
+	unknownCmds := m.unknownCmds
 	sendFailures, pollFailures := m.sendFailures, m.pollFailures
 	lastNotifiedAt, startedAt := m.lastNotifiedAt, m.startedAt
 	eventsAccepted, eventsSent := m.eventsAccepted, m.eventsSent
@@ -199,6 +214,8 @@ func (m *botMetrics) render(now time.Time) string {
 		"Отправленные уведомления по виду события", "counter", "kind", notifications)
 	writeFamily(&b, "statusbot_commands_total",
 		"Обработанные команды владельца", "counter", "command", commands)
+	writeSingle(&b, "statusbot_unknown_commands_total",
+		"Команды, которые бот не распознал", "counter", unknownCmds)
 
 	writeFamily(&b, "statusbot_deploy_events_dropped_total",
 		"События выкатки, снятые с очереди без сообщения", "counter", "reason", eventsDropped)

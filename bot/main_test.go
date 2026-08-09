@@ -73,7 +73,7 @@ func TestReplyToOwner(t *testing.T) {
 		{"версии", "/versions", "v1"},
 		{"инциденты", "/incidents", "Инцидентов не было"},
 		{"короткий псевдоним", "/s", "Snakes"},
-		{"неизвестная команда", "/deploy", "Не знаю такой команды"},
+		{"неизвестная команда", "/deploy", "Не знаю такую команду"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
