@@ -190,10 +190,10 @@ func formatHelp() string {
 		"",
 		"Если удобнее командами:",
 		"/status — что живо, что лежит, аптайм",
-		"/versions — версии сервисов со временем сборки",
 		"/changelog — что менялось в последних выкатках",
 		"/changelog metro — то же по одному сервису, с историей",
 		"/incidents — последние падения",
+		"/quiet 2h — помолчать (можно 8h, off — снять раньше)",
 		"/help — эта справка",
 		"",
 		"Сам сообщу, когда что-то упадёт, поднимется или обновится.",
@@ -286,7 +286,12 @@ func overallStrip(s *Summary) string {
 // четырнадцати белых квадратов не сообщает ничего и только занимает строку.
 func hasHistory(s string) bool { return strings.ContainsAny(s, "🟩🟨🟧🟥") }
 
-func formatStatus(s *Summary, now time.Time) string {
+// muted и mutedUntil — состояние тишины. Раньше его вообще не было видно на
+// экране статуса: факт «бот сейчас молчит» знал только тот, кто сам жал
+// «Тихо 2 ч»/«До утра» и помнил об этом, а State.Muted читал только цикл
+// уведомлений. Отсюда молчание, которое забыли снять, было незаметно ровно
+// до следующей аварии.
+func formatStatus(s *Summary, now time.Time, muted bool, mutedUntil time.Time) string {
 	var b strings.Builder
 
 	// Тот же принцип, что на странице: здоровое сворачивается, сломанное
@@ -302,6 +307,9 @@ func formatStatus(s *Summary, now time.Time) string {
 		b.WriteString(down + " <b>Крупный сбой</b>")
 	default:
 		b.WriteString(degraded + " <b>Частичный сбой</b>")
+	}
+	if muted {
+		fmt.Fprintf(&b, "\n🔕 молчу до %s — /quiet off, чтобы снять раньше", fmtTime(mutedUntil))
 	}
 
 	var okCrit, totalCrit, auxBad int
@@ -511,31 +519,6 @@ func freshness(s *Summary, now time.Time) string {
 	return line
 }
 
-func formatVersions(s *Summary, now time.Time) string {
-	var b strings.Builder
-	b.WriteString("<b>Версии</b>\n")
-	for _, p := range s.Projects {
-		fmt.Fprintf(&b, "\n<b>%s</b>\n", link(p.Title, p.URL))
-		if len(p.Builds) == 0 {
-			b.WriteString("  источник версии не настроен\n")
-			continue
-		}
-		for _, bl := range p.Builds {
-			version := bl.Version
-			if version == "" {
-				version = "неизвестна"
-			}
-			fmt.Fprintf(&b, "  %s: <code>%s</code>", link(bl.Title, bl.URL), esc(version))
-			if t, ok := parseTime(bl.At); ok {
-				fmt.Fprintf(&b, "\n    собрано %s (%s назад)", fmtTime(t), humanDur(now.Sub(t)))
-			}
-			b.WriteString("\n")
-		}
-	}
-	b.WriteString("\n" + freshness(s, now))
-	return b.String()
-}
-
 func formatIncidents(s *Summary, now time.Time) string {
 	if len(s.Incidents) == 0 {
 		return up + " Инцидентов не было"
@@ -615,7 +598,10 @@ func formatEvent(e Event) string {
 		return s
 
 	default:
-		return esc(e.Title)
+		// Незнакомый вид наблюдения — не повод показать голый заголовок без
+		// глагола: тот же случай в formatDeploy молчит, и здесь ему положено
+		// вести себя одинаково.
+		return ""
 	}
 }
 
@@ -730,6 +716,71 @@ var deployReasons = map[string]string{
 func stageText(s string) string  { return deployStages[s] }
 func reasonText(s string) string { return deployReasons[s] }
 
+// deployOutcome — одна строка единой таблицы "вид события выкатки → как о нём
+// написать": значок и глагол.
+//
+// РАНЬШЕ ЭТОТ ЖЕ ИСХОД ОПИСЫВАЛИ ДВА СЛОВАРЯ ПОРОЗНЬ. formatDeploy держал
+// мужской род («не выкачен», «откачен автоматически» — по имени цели),
+// outcomeText — женский («провалена», «откачена — …» — про «цель»), и какой
+// из них увидит владелец, решало число целей в прогоне, а не смысл события.
+// Один прогон из шести целей мог показать один и тот же исход двумя разными
+// словами в зависимости от того, был ли рядом ещё кто-то. Таблица ниже —
+// единственный источник глагола для ОБЕИХ форм сообщения; род оставлен
+// мужским, тем же, что был в formatDeploy, — она склоняется по имени цели
+// («Админка не выкачен»), а не по смыслу слова «цель».
+//
+// deployStarted входит в таблицу ради значка и глагола, которые нужны
+// ГРУППОВОМУ сообщению (цель, ещё не объявившая исход, но упомянутая рядом с
+// теми, кто уже объявил). Одиночному сообщению это не нужно: started —
+// служебный вид, который сам по себе в чат не идёт (контракт, §4, §12), и
+// formatDeploy обрабатывает его отдельно, до обращения к таблице.
+var deployOutcomeTable = map[string]struct{ icon, verb string }{
+	deploySuccess:    {iconOK, "выкачен"},
+	deployStarted:    {iconWait, "выкатывается…"},
+	deployPublished:  {iconPub, "опубликован"},
+	deployFailure:    {iconFail, "не выкачен"},
+	deployRolledBack: {iconBack, "откачен автоматически"},
+	deployRollback:   {iconBack, "откачен руками"},
+}
+
+// deployIcon — значок исхода. Незнакомый вид — тот же серый кружок, что и у
+// незнакомого статуса проверки: не авария, а неизвестность.
+func deployIcon(kind string) string {
+	if o, ok := deployOutcomeTable[kind]; ok {
+		return o.icon
+	}
+	return unknown
+}
+
+// deployVerb — глагол исхода без деталей. Пустая строка — незнакомый вид.
+func deployVerb(kind string) string {
+	return deployOutcomeTable[kind].verb
+}
+
+// deployDetailText — уточнение исхода: стадия провала или причина отката.
+// Один источник для обеих форм сообщения — одиночной (отдельной строкой) и
+// групповой (после тире); расхождение в тексте стадии между ними было бы той
+// же болезнью, для которой заведена deployOutcomeTable.
+func deployDetailText(d Deploy) string {
+	switch d.Kind {
+	case deployFailure:
+		if st := stageText(d.Stage); st != "" {
+			return "остановились на стадии: " + st
+		}
+	case deployRolledBack:
+		// Причина точнее стадии и говорит о том же месте («healthcheck не
+		// дождался ответа» вместо «остановились на healthcheck»), поэтому
+		// стадия печатается, только когда причина незнакома.
+		if r := reasonText(d.Reason); r != "" {
+			return "причина: " + r
+		}
+		if st := stageText(d.Stage); st != "" {
+			return "остановились на стадии: " + st
+		}
+	}
+	return ""
+}
+
 // runURLRe — адрес прогона. Список разрешённого, собранный по тому же правилу,
 // что и commitURLRe: буквальные схема и хост, буквальный путь GitHub Actions,
 // номер прогона цифрами. Всё остальное ссылкой не станет и молча выбросится —
@@ -814,59 +865,48 @@ func formatDeploy(d Deploy) string {
 	d = sanitizeDeploy(d)
 	name := link(deployName(d), d.URL)
 
-	switch d.Kind {
-	case deploySuccess:
+	if d.Kind == deploySuccess {
 		return formatEvent(Event{
 			Kind: KindRelease, Title: deployName(d), URL: d.URL, Project: d.Project,
 			Version: d.Version, Previous: d.Previous, CommitURL: d.CommitURL,
 			Changelog: d.Changelog, At: d.At,
 		})
-
-	case deployFailure:
-		// Сначала ЧТО не произошло, потом где остановилось, и только потом
-		// адрес прогона: порядок тот же, что у сообщения о падении, — сперва
-		// то, ради чего читают, потом то, куда идти разбираться.
-		s := fmt.Sprintf("%s <b>%s</b> не выкачен", iconFail, name)
-		if d.Version != "" {
-			s += "\n" + versionHTML(d.Version, d.CommitURL)
-		}
-		if st := stageText(d.Stage); st != "" {
-			s += "\nостановились на стадии: " + st
-		}
-		return s + runTail(d)
-
-	case deployRolledBack:
-		s := fmt.Sprintf("%s <b>%s</b> откачен автоматически", iconBack, name)
-		if d.Version != "" {
-			s += "\nне удержался " + versionHTML(d.Version, d.CommitURL)
-		}
-		// Причина точнее стадии и говорит о том же месте («healthcheck не
-		// дождался ответа» вместо «остановились на healthcheck»), поэтому
-		// стадия печатается, только когда причина незнакома.
-		if r := reasonText(d.Reason); r != "" {
-			s += "\nпричина: " + r
-		} else if st := stageText(d.Stage); st != "" {
-			s += "\nостановились на стадии: " + st
-		}
-		return s + runTail(d)
-
-	case deployRollback:
-		s := fmt.Sprintf("%s <b>%s</b> откачен руками", iconBack, name)
-		if d.Version != "" {
-			s += "\nвернули " + versionHTML(d.Version, d.CommitURL)
-		}
-		return s + runTail(d)
-
-	case deployPublished:
-		s := fmt.Sprintf("%s <b>%s</b> — опубликован файл", iconPub, name)
-		if d.Version != "" {
-			s += "\n" + versionHTML(d.Version, d.CommitURL)
-		}
-		return s + runTail(d)
-
-	default:
+	}
+	// started молчит, даже если он — единственная цель прогона: рассказывать
+	// в чате «выкатывается» и ни о чём больше — значит слать сообщение без
+	// исхода (контракт, §4, §12). В групповом сообщении та же цель наоборот
+	// обязана остаться строкой: там она стоит рядом с уже объявленными
+	// исходами других целей, и молчание о ней читалось бы как «эту цель не
+	// катили» (см. outcomeText).
+	if d.Kind == deployStarted {
 		return ""
 	}
+
+	verb := deployVerb(d.Kind)
+	if verb == "" {
+		// Незнакомый вид — не повод терять единственную цель прогона молча:
+		// но и выдумывать формулировку не из чего, поэтому сообщение пустое.
+		return ""
+	}
+
+	// Сначала ЧТО произошло, потом версия, потом деталь (стадия/причина), и
+	// только потом адрес прогона: порядок тот же, что у сообщения о падении,
+	// — сперва то, ради чего читают, потом то, куда идти разбираться.
+	s := fmt.Sprintf("%s <b>%s</b> %s", deployIcon(d.Kind), name, verb)
+	if d.Version != "" {
+		switch d.Kind {
+		case deployRolledBack:
+			s += "\nне удержался " + versionHTML(d.Version, d.CommitURL)
+		case deployRollback:
+			s += "\nвернули " + versionHTML(d.Version, d.CommitURL)
+		default: // failure, published
+			s += "\n" + versionHTML(d.Version, d.CommitURL)
+		}
+	}
+	if det := deployDetailText(d); det != "" {
+		s += "\n" + det
+	}
+	return s + runTail(d)
 }
 
 // runTail — общий хвост сообщения о выкатке: ссылка на прогон и время.
@@ -977,55 +1017,29 @@ func deployOutcomes(ds []Deploy) []Deploy {
 	return out
 }
 
-// outcomeText — исход цели строкой. Род женский: строка про ЦЕЛЬ, а не про
-// сервис («админка откачена»), и в одиночном сообщении, где речь о компоненте,
-// формулировки свои.
+// outcomeText — исход цели строкой в карточке прогона.
+//
+// Глагол и деталь берутся из той же таблицы и той же функции, что и у
+// одиночного сообщения (deployOutcomeTable, deployDetailText): раньше здесь
+// был свой, женский род («провалена», «откачена — …» про «цель»), и один и
+// тот же исход читался по-разному в зависимости от числа целей в прогоне.
 func outcomeText(d Deploy) string {
-	switch d.Kind {
-	case deploySuccess:
-		return "выкачена"
-	case deployStarted:
-		return "выкатывается…"
-	case deployPublished:
-		return "опубликована"
-	case deployFailure:
-		if st := stageText(d.Stage); st != "" {
-			return "провалена на стадии: " + st
-		}
-		return "провалена"
-	case deployRolledBack:
-		if r := reasonText(d.Reason); r != "" {
-			return "откачена — " + r
-		}
-		return "откачена"
-	case deployRollback:
-		if d.Version != "" {
-			return "откачена руками на " + versionHTML(d.Version, d.CommitURL)
-		}
-		return "откачена руками"
-	default:
+	verb := deployVerb(d.Kind)
+	if verb == "" {
 		// Незнакомый вид события — не повод потерять строку: пропавшая цель
 		// читается как «её не катили», и это враньё.
 		return "исход неизвестен"
 	}
+	if d.Kind == deployRollback && d.Version != "" {
+		return verb + " на " + versionHTML(d.Version, d.CommitURL)
+	}
+	if det := deployDetailText(d); det != "" {
+		return verb + " — " + det
+	}
+	return verb
 }
 
-func outcomeIcon(d Deploy) string {
-	switch d.Kind {
-	case deploySuccess:
-		return iconOK
-	case deployStarted:
-		return iconWait
-	case deployPublished:
-		return iconPub
-	case deployFailure:
-		return iconFail
-	case deployRolledBack, deployRollback:
-		return iconBack
-	default:
-		return unknown
-	}
-}
+func outcomeIcon(d Deploy) string { return deployIcon(d.Kind) }
 
 // runVersion — версия прогона и адрес её коммита.
 //

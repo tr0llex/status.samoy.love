@@ -7,28 +7,41 @@ import "strings"
 const (
 	CmdHelp      = "help"
 	CmdStatus    = "status"
-	CmdVersions  = "versions"
 	CmdIncidents = "incidents"
 	CmdChangelog = "changelog"
+	// CmdQuiet — тишина по требованию, а не только по кнопке под уже
+	// случившейся аварией: «/quiet 2h» перед плановыми работами или ручной
+	// выкаткой, «/quiet off», чтобы снять раньше срока, голый «/quiet» —
+	// посмотреть, молчит ли бот сейчас.
+	CmdQuiet = "quiet"
 )
 
+// aliases сведён к каноническому имени команды и ОДНОМУ короткому псевдониму
+// на каждую — раньше их было пятнадцать на пять команд, и разница между
+// «/changelog», «/changes», «/cl» и «/c» не помогала ничем, кроме количества
+// строк здесь.
+//
+// Псевдоним «log» у /incidents убран отдельно от общего сокращения: «журнал»
+// в этом хозяйстве значит журнал ВЫКАТОК (см. /changelog и контракт
+// deploy-kit), и вести им на инциденты — не сокращать команду, а путать.
+//
+// /changelog не переименован в /deploys, хотя владелец назвал именно это имя
+// желаемым: экран объединённых выкаток по журналу событий (волна 5 плана)
+// ещё не реализован, а функциональность под текущим /changelog — это
+// изменения по данным summary.json, не события из EVENTS_DIR. Переименовать
+// без переделки экрана значило бы просто взять другое слово для того же —
+// решение оставлено следующей волне, когда экран будет чем наполнить.
 var aliases = map[string]string{
 	"help":      CmdHelp,
-	"start":     CmdHelp,
-	"h":         CmdHelp,
+	"start":     CmdHelp, // Telegram сам шлёт /start при первом открытии чата
 	"status":    CmdStatus,
 	"s":         CmdStatus,
-	"state":     CmdStatus,
-	"versions":  CmdVersions,
-	"version":   CmdVersions,
-	"v":         CmdVersions,
 	"incidents": CmdIncidents,
 	"i":         CmdIncidents,
-	"log":       CmdIncidents,
 	"changelog": CmdChangelog,
-	"changes":   CmdChangelog,
-	"cl":        CmdChangelog,
 	"c":         CmdChangelog,
+	"quiet":     CmdQuiet,
+	"q":         CmdQuiet,
 }
 
 // parseCommand достаёт команду из текста сообщения.
@@ -59,6 +72,22 @@ func parseCommand(text, self string) string {
 // Пустая строка означает «не наша команда».
 func resolveCommand(word string) string {
 	return aliases[word]
+}
+
+// botCommands — синее меню Telegram рядом с полем ввода.
+//
+// Раньше setMyCommands нигде не вызывался, и меню оставалось пустым: чтобы
+// набрать команду, владелец должен был её помнить, а не выбрать из списка.
+// Список короче aliases намеренно: меню — это канонические команды, а не
+// все их псевдонимы, иначе там нашлось бы место и «/c», и «/cl».
+func botCommands() []BotCommand {
+	return []BotCommand{
+		{Command: CmdStatus, Description: "что живо, что лежит, аптайм"},
+		{Command: CmdChangelog, Description: "что менялось в последних выкатках"},
+		{Command: CmdIncidents, Description: "последние падения"},
+		{Command: CmdQuiet, Description: "помолчать (2h, 8h, off)"},
+		{Command: CmdHelp, Description: "справка"},
+	}
 }
 
 // commandArg — то, что владелец дописал после команды.

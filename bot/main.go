@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -81,6 +82,23 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Имя бота нужно, чтобы отличать «/status» от «/status@сосед_по_чату» в
+	// группе. TELEGRAM_BOT_USERNAME остаётся опциональным override (тесты,
+	// узкий случай, когда getMe недоступен); по умолчанию бот спрашивает у
+	// Telegram сам, а не полагается на переменную, забытую в файле окружения.
+	self := cfg.Self
+	if self == "" {
+		if name, err := tg.GetMe(ctx); err != nil {
+			log.Printf("getMe не удался, TELEGRAM_BOT_USERNAME не задан — бот будет отвечать на команды для ЛЮБОГО бота в группе: %v", err)
+		} else {
+			self = name
+		}
+	}
+
+	if err := tg.SetMyCommands(ctx, botCommands()); err != nil {
+		log.Printf("список команд Telegram не обновлён: %v", err)
+	}
+
 	// Проверка канала после выкатки. Молчащий бот неотличим от работающего,
 	// пока что-нибудь не упадёт, — а выяснять это в момент аварии поздно.
 	// Проверка молчалива для владельца, но не для выкатки: её код возврата
@@ -121,7 +139,7 @@ func main() {
 			st.dirty = false
 			return saveGroups(cfg.Groups, store.groups)
 		}, metrics, func(v groupView) string { return renderDeployGroup(summaryPath, v) })
-		sender.keyboard = func(v groupView) *Keyboard { return deployKeyboard(summaryPath, v) }
+		sender.keyboard = func(v groupView) *Keyboard { return deployKeyboardFor(summaryPath, v) }
 		sender.log = log.Printf
 	} else {
 		log.Print("журнал выкаток не читается: EVENTS_DIR выключен")
@@ -246,7 +264,7 @@ func main() {
 					st.Offset = u.UpdateID + 1
 				}
 				mu.Unlock()
-				handleUpdate(ctx, tg, u, cfg.Owner, cfg.OwnerUser, cfg.Self, summaryPath)
+				handleUpdate(ctx, tg, u, cfg.Owner, cfg.OwnerUser, self, summaryPath)
 			}
 			if len(updates) > 0 {
 				mu.Lock()
@@ -351,7 +369,7 @@ func selfTest(ctx context.Context, tg *Telegram, owner int64, summaryPath string
 	if err != nil {
 		return err
 	}
-	if formatStatus(s, time.Now().UTC()) == "" {
+	if formatStatus(s, time.Now().UTC(), false, time.Time{}) == "" {
 		return fmt.Errorf("сводка построилась пустой: данные %s", summaryPath)
 	}
 	return tg.Ping(ctx, owner)
@@ -384,7 +402,14 @@ func handleUpdate(ctx context.Context, tg *Telegram, u Update, owner, ownerUser 
 	}
 	cmd := resolveCommand(word)
 	if cmd == "" {
-		if err := tg.SendWith(ctx, owner, "Не знаю такой команды.\n\n"+formatHelp(), navKeyboard(ViewHelp)); err != nil {
+		// Короткий ответ, а не полная справка (20 строк): незнакомая команда
+		// — самый частый случай опечатки, и топить её в справке — не помощь.
+		// Логируется и считается отдельно от команд, которые бот выполнил:
+		// «команда пришла, но бот её не понял» — другая авария, чем «команды
+		// не доходят вовсе».
+		metrics.unknownCommand()
+		log.Printf("неизвестная команда: /%s", logSafe(word))
+		if err := tg.SendWith(ctx, owner, "Не знаю такую команду. /help — список команд.", navKeyboard(ViewHelp)); err != nil {
 			log.Printf("ответ не отправлен: %v", err)
 		}
 		return
@@ -396,6 +421,16 @@ func handleUpdate(ctx context.Context, tg *Telegram, u Update, owner, ownerUser 
 	metrics.command(cmd)
 	log.Printf("команда /%s", cmd)
 
+	// /quiet не листает экраны, а меняет (или показывает) тишину — та же
+	// развилка, что у кнопок «Тихо 2 ч»/«До утра»/«Снова говорить» под
+	// уведомлением об аварии, только доступная ДО аварии: перед плановыми
+	// работами или ручной выкаткой глушить бота было нечем, кроме как
+	// дождаться первого падения.
+	if cmd == CmdQuiet {
+		handleQuiet(ctx, tg, owner, commandArg(u.Message.Text))
+		return
+	}
+
 	// Аргумент есть только у /changelog: «/changelog metro» — про одну цель,
 	// «/changelog» — про всё хозяйство. Остальные команды его игнорируют, как
 	// и раньше: «/status всё ли живо» — это /status.
@@ -406,6 +441,43 @@ func handleUpdate(ctx context.Context, tg *Telegram, u Update, owner, ownerUser 
 	if err := tg.SendLong(ctx, owner, text, kb); err != nil {
 		metrics.sendFailed()
 		log.Printf("ответ на /%s не отправлен: %v", cmd, err)
+	}
+}
+
+// handleQuiet отвечает на /quiet.
+//
+// Три формы: «/quiet 2h» (любая длительность, которую разбирает
+// time.ParseDuration — «2h», «30m», «8h») задаёт тишину, «/quiet off» снимает
+// её раньше срока, голый «/quiet» ничего не меняет и просто показывает,
+// молчит ли бот сейчас, — то же самое, что владелец увидел бы строкой на
+// /status, но без остального экрана.
+func handleQuiet(ctx context.Context, tg *Telegram, owner int64, arg string) {
+	arg = strings.ToLower(strings.TrimSpace(arg))
+	now := time.Now().UTC()
+
+	var text string
+	switch arg {
+	case "":
+		muted, until := muteState(now)
+		if muted {
+			text = fmt.Sprintf("🔕 Молчу до %s", fmtTime(until))
+		} else {
+			text = "🔔 Не молчу"
+		}
+	case "off":
+		text = applyMute(now, 0, true)
+	default:
+		d, err := time.ParseDuration(arg)
+		if err != nil || d <= 0 {
+			text = "Не понял длительность. Пример: <code>/quiet 2h</code>, <code>/quiet 8h</code>, <code>/quiet off</code>"
+			break
+		}
+		text = applyMute(now, d, false)
+	}
+
+	if err := tg.SendWith(ctx, owner, text, mutedKeyboard()); err != nil {
+		metrics.sendFailed()
+		log.Printf("ответ на /quiet не отправлен: %v", err)
 	}
 }
 
@@ -575,17 +647,29 @@ func renderDeployGroup(summaryPath string, v groupView) string {
 	return formatDeployGroup(reg.project(ds), ds)
 }
 
-// deployKeyboard — та же клавиатура, что под уведомлением о падении: «что
-// сейчас» по проекту выкатки и кнопка открыть. Своих кнопок у выкатки нет —
-// откат из бота требует прав на прод и решается отдельно.
-func deployKeyboard(summaryPath string, v groupView) *Keyboard {
+// deployKeyboardFor — клавиатура карточки прогона (deployKeyboard,
+// keyboard.go) с проектом и адресом прогона, найденными по её целям.
+//
+// Проект узнаём из реестра summary.json, а не из события: имя проекта в
+// хозяйстве одно (контракт, §4). Адрес прогона одинаков у всех целей одного
+// прогона (один пуш — один CI-run), поэтому годится первый непустой.
+func deployKeyboardFor(summaryPath string, v groupView) *Keyboard {
 	reg := loadRegistry(summaryPath)
+	var projectID string
 	for _, t := range v.Targets {
 		if _, _, project := reg.target(t.App); project != "" {
-			return alertKeyboard(project)
+			projectID = project
+			break
 		}
 	}
-	return alertKeyboard("")
+	var runURL string
+	for _, t := range v.Targets {
+		if t.RunURL != "" {
+			runURL = t.RunURL
+			break
+		}
+	}
+	return deployKeyboard(projectID, runURL)
 }
 
 // registry — реестр проектов из summary.json: по id цели выкатки даёт

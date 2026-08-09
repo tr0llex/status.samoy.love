@@ -41,7 +41,7 @@ func TestFmtTimeMoscow(t *testing.T) {
 
 func TestFormatHelpListsCommands(t *testing.T) {
 	help := formatHelp()
-	for _, cmd := range []string{"/status", "/versions", "/incidents", "/help"} {
+	for _, cmd := range []string{"/status", "/changelog", "/incidents", "/quiet", "/help"} {
 		if !strings.Contains(help, cmd) {
 			t.Errorf("в справке нет %s", cmd)
 		}
@@ -74,7 +74,7 @@ func TestFormatStatus(t *testing.T) {
 		}},
 	}
 
-	got := formatStatus(s, now)
+	got := formatStatus(s, now, false, time.Time{})
 
 	// Сломанное разворачивается целиком: что это, для кого плохо, почему и
 	// сколько уже длится.
@@ -98,6 +98,23 @@ func TestFormatStatus(t *testing.T) {
 	}
 }
 
+func TestFormatStatusShowsMuteState(t *testing.T) {
+	// Раньше тишину нельзя было увидеть на самом экране статуса: узнать, что
+	// бот молчит, можно было только вспомнив, что сам её включил.
+	now := base
+	s := &Summary{Updated: now.Format(time.RFC3339), Overall: "operational"}
+
+	quiet := formatStatus(s, now, true, now.Add(2*time.Hour))
+	if !strings.Contains(quiet, "молчу до") {
+		t.Errorf("тишина включена, но на экране статуса это не видно:\n%s", quiet)
+	}
+
+	loud := formatStatus(s, now, false, time.Time{})
+	if strings.Contains(loud, "молчу до") {
+		t.Errorf("тишина выключена, но экран статуса говорит обратное:\n%s", loud)
+	}
+}
+
 func TestFormatStatusWarnsAboutStaleData(t *testing.T) {
 	now := base
 	s := &Summary{
@@ -106,7 +123,7 @@ func TestFormatStatusWarnsAboutStaleData(t *testing.T) {
 		Updated: now.Add(-30 * time.Minute).Format(time.RFC3339),
 		Overall: "operational",
 	}
-	got := formatStatus(s, now)
+	got := formatStatus(s, now, false, time.Time{})
 	if !strings.Contains(got, "Данные устарели") {
 		t.Errorf("нет предупреждения о несвежих данных:\n%s", got)
 	}
@@ -122,37 +139,12 @@ func TestFormatEscapesHTML(t *testing.T) {
 			Checks: []Check{{Name: "A & B", Status: "down", Error: "<script>"}},
 		}},
 	}
-	got := formatStatus(s, now)
+	got := formatStatus(s, now, false, time.Time{})
 	if strings.Contains(got, "<script>") || strings.Contains(got, "<b>взлом</b>") {
 		t.Errorf("разметка из данных попала в сообщение как есть:\n%s", got)
 	}
 	if !strings.Contains(got, "A &amp; B") {
 		t.Errorf("амперсанд не экранирован:\n%s", got)
-	}
-}
-
-func TestFormatVersions(t *testing.T) {
-	now := base
-	s := &Summary{
-		Updated: now.Format(time.RFC3339),
-		Projects: []Project{
-			{
-				Title: "Snakes",
-				Builds: []Build{{
-					Title: "Сервер и клиент", Version: "20260802-1200-abc1234",
-					At: now.Add(-3 * time.Hour).Format(time.RFC3339),
-				}},
-			},
-			// Источник версии не настроен — это должно быть видно, а не
-			// выглядеть как пустой проект.
-			{Title: "Метро"},
-		},
-	}
-	got := formatVersions(s, now)
-	for _, want := range []string{"20260802-1200-abc1234", "собрано", "3 ч назад", "не настроен"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("в ответе нет %q:\n%s", want, got)
-		}
 	}
 }
 
@@ -854,7 +846,7 @@ func TestОдиночнаяЦельДаётПрежнююФормуРелиза(
 	if got != want {
 		t.Errorf("одиночная цель дала не прежнюю форму:\nожидали %q\nполучили %q", want, got)
 	}
-	for _, trace := range []string{"выкачена", "выкатывается"} {
+	for _, trace := range []string{"выкачен", "выкатывается"} {
 		if strings.Contains(got, trace) {
 			t.Errorf("в одиночном сообщении остался след группировки (%q):\n%s", trace, got)
 		}
@@ -907,10 +899,10 @@ func TestСообщениеПрогонаПечатаетИзмененияОд�
 	// Цели — строками с исходом. Каждая ровно одна: цель, объявившая о себе
 	// дважды, занимает одну строку, а не две.
 	for _, want := range []string{
-		"Сайт</a> — выкачена",
-		"Лаунчер</a> — выкачена",
-		"API</a> — провалена на стадии: службы systemd",
-		"Админка</a> — откачена — healthcheck не дождался ответа",
+		"Сайт</a> — выкачен",
+		"Лаунчер</a> — выкачен",
+		"API</a> — не выкачен — остановились на стадии: службы systemd",
+		"Админка</a> — откачен автоматически — причина: healthcheck не дождался ответа",
 		"Бот</a> — выкатывается…",
 	} {
 		if n := strings.Count(got, want); n != 1 {
@@ -936,7 +928,7 @@ func TestСообщениеПрогонаРастётПоМереГотовно�
 	run := chillhubRun()
 	for n := 3; n <= len(run); n++ {
 		got := formatDeployGroup("ChillHub", run[:n])
-		if !strings.Contains(got, "Лаунчер</a> — выкачена") {
+		if !strings.Contains(got, "Лаунчер</a> — выкачен") {
 			t.Errorf("на %d событиях исчезла уже объявленная цель:\n%s", n, got)
 		}
 		if c := strings.Count(got, "<b>Изменения</b>"); c != 1 {
@@ -949,8 +941,8 @@ func TestСообщениеПрогонаРастётПоМереГотовно�
 	late := append(chillhubRun(), Deploy{
 		Kind: deployStarted, App: "chillhub-launcher", Title: "Лаунчер", At: base,
 	})
-	if got := formatDeployGroup("ChillHub", late); !strings.Contains(got, "Лаунчер — выкачена") &&
-		!strings.Contains(got, "Лаунчер</a> — выкачена") {
+	if got := formatDeployGroup("ChillHub", late); !strings.Contains(got, "Лаунчер — выкачен") &&
+		!strings.Contains(got, "Лаунчер</a> — выкачен") {
 		t.Errorf("запоздавший started откатил исход цели назад:\n%s", got)
 	}
 }
@@ -966,7 +958,7 @@ func TestЧислоЦелейВСообщенииОграничено(t *testing
 		})
 	}
 	got := formatDeployGroup("Хозяйство", ds)
-	if n := strings.Count(got, "— выкачена"); n != deployTargets {
+	if n := strings.Count(got, "— выкачен"); n != deployTargets {
 		t.Errorf("строк целей %d, предел %d:\n%s", n, deployTargets, got)
 	}
 	// Молчать про отброшенное нельзя: обрезанный список читается как полный.

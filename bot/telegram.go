@@ -431,6 +431,38 @@ func (t *Telegram) AnswerCallback(ctx context.Context, id, text string) error {
 	}, nil)
 }
 
+// GetMe отдаёт имя пользователя (username) самого бота.
+//
+// Раньше это имя бралось ТОЛЬКО из TELEGRAM_BOT_USERNAME, и при пустой
+// переменной parseCommand переставал отсекать обращения к другим ботам в
+// группе (self == "" — «отвечаем на любое имя»): бот начинал реагировать на
+// «/status@other_bot», адресованное соседу по чату. getMe знает своё имя
+// без настройки; переменная окружения остаётся опциональным override — им
+// пользуются тесты и те, кто хочет обойтись без лишнего запроса при старте.
+func (t *Telegram) GetMe(ctx context.Context) (string, error) {
+	var me struct {
+		Username string `json:"username"`
+	}
+	if err := t.call(ctx, "getMe", map[string]any{}, &me); err != nil {
+		return "", err
+	}
+	return me.Username, nil
+}
+
+// BotCommand — одна строка синего меню команд Telegram.
+type BotCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
+// SetMyCommands наполняет синее меню команд рядом с полем ввода.
+//
+// Вызывается один раз при старте: меню не привязано к чату и не меняется
+// между запусками, кроме как при правке этого же списка в коде.
+func (t *Telegram) SetMyCommands(ctx context.Context, cmds []BotCommand) error {
+	return t.call(ctx, "setMyCommands", map[string]any{"commands": cmds}, nil)
+}
+
 func (t *Telegram) GetUpdates(ctx context.Context, offset int64, timeout time.Duration) ([]Update, error) {
 	var updates []Update
 	err := t.call(ctx, "getUpdates", map[string]any{

@@ -486,8 +486,8 @@ func TestE2ESixTargetsOfOneRunGiveOneMessage(t *testing.T) {
 		wantContains(t, "карточка прогона", final, tg.app)
 	}
 	wantContains(t, "карточка прогона", final,
-		"выкачена", "провалена на стадии: "+deployStages["gates"],
-		"откачена — "+deployReasons["health_failed"], "опубликована")
+		"выкачен", "не выкачен — остановились на стадии: "+deployStages["gates"],
+		"откачен автоматически — причина: "+deployReasons["health_failed"], "опубликован")
 
 	// Список изменений печатается ОДИН раз: он общий для прогона.
 	if n := strings.Count(final, "<b>Изменения</b>"); n != 1 {

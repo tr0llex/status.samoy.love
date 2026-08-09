@@ -7,7 +7,7 @@ import (
 )
 
 func TestКлавиатураПомечаетТекущийЭкран(t *testing.T) {
-	kb := navKeyboard(ViewVersions)
+	kb := navKeyboard(ViewIncidents)
 	var marked []string
 	for _, row := range kb.InlineKeyboard {
 		for _, b := range row {
@@ -19,14 +19,14 @@ func TestКлавиатураПомечаетТекущийЭкран(t *testing
 	if len(marked) != 1 {
 		t.Fatalf("помечен должен быть ровно один экран, получили %v", marked)
 	}
-	if !strings.Contains(marked[0], "Версии") {
+	if !strings.Contains(marked[0], "Инциденты") {
 		t.Errorf("помечен не тот экран: %q", marked[0])
 	}
 }
 
 func TestКнопкаОбновитьВедётНаТотЖеЭкран(t *testing.T) {
 	// Иначе «Обновить» на экране инцидентов молча возвращало бы на статус.
-	for _, view := range []string{ViewStatus, ViewVersions, ViewIncidents} {
+	for _, view := range []string{ViewStatus, ViewIncidents, ViewChangelog} {
 		kb := navKeyboard(view)
 		var found bool
 		for _, row := range kb.InlineKeyboard {
@@ -42,31 +42,6 @@ func TestКнопкаОбновитьВедётНаТотЖеЭкран(t *testi
 		if !found {
 			t.Errorf("на экране %s нет кнопки «Обновить»", view)
 		}
-	}
-}
-
-func TestСЭкранаВерсийМожноПопастьВИзменения(t *testing.T) {
-	// Экран версий отвечает на вопрос «какая версия сейчас», и следующий
-	// вопрос всегда «а что в ней». Пока ответ на него был только командой,
-	// про команду надо было ещё узнать.
-	kb := versionsKeyboard()
-	var toChangelog, refresh string
-	for _, row := range kb.InlineKeyboard {
-		for _, b := range row {
-			if b.CallbackData == ViewChangelog {
-				toChangelog = b.Text
-			}
-			if strings.Contains(b.Text, "Обновить") {
-				refresh = b.CallbackData
-			}
-		}
-	}
-	if toChangelog == "" {
-		t.Error("с экрана версий нельзя попасть в изменения")
-	}
-	// Навигация при этом осталась прежней: «Обновить» ведёт на тот же экран.
-	if refresh != ViewVersions {
-		t.Errorf("«Обновить» на экране версий ведёт на %q", refresh)
 	}
 }
 
@@ -177,11 +152,11 @@ func TestИсчезнувшийПроектВозвращаетНаСтатус(
 
 func TestКнопкаПодУведомлениемВедётВУпавшийПроект(t *testing.T) {
 	kb := alertKeyboard("metro")
-	if got := kb.InlineKeyboard[0][0].CallbackData; got != ViewProject+"metro" {
+	if got := kb.InlineKeyboard[0][0].CallbackData; got != ActWhatNowPrefix+ViewProject+"metro" {
 		t.Errorf("кнопка ведёт на %q, а не в упавший проект", got)
 	}
 	// Событие без проекта (устаревшие данные агента) — общий экран.
-	if got := alertKeyboard("").InlineKeyboard[0][0].CallbackData; got != ViewStatus {
+	if got := alertKeyboard("").InlineKeyboard[0][0].CallbackData; got != ActWhatNowPrefix+ViewStatus {
 		t.Errorf("без проекта ожидали общий экран, получили %q", got)
 	}
 }
