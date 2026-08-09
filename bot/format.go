@@ -588,6 +588,14 @@ func formatEvent(e Event) string {
 			s += fmt.Sprintf("\nбыла <code>%s</code>", esc(e.Previous))
 		}
 		s += "\n<i>собрано " + fmtTime(e.At) + "</i>"
+		// Ссылка на ручное действие — сразу после времени сборки, а не в конце
+		// после списка изменений: без неё релиз читается как завершённый, хотя
+		// для части целей (см. deployAdminLinks) переключение канала ждёт
+		// человека отдельным кликом в другой вкладке. Задвинуть её за длинный
+		// changelog значило бы, что её не долистают.
+		if e.AdminURL != "" {
+			s += fmt.Sprintf("\n👉 <a href=\"%s\">переключить на неё в админке</a>", esc(e.AdminURL))
+		}
 		// Список изменений — последним и через пустую строку: он самый
 		// длинный, самый необязательный и единственный, которого может не
 		// быть. Всё, ради чего уведомление читают в первую очередь (что
@@ -715,6 +723,24 @@ var deployReasons = map[string]string{
 
 func stageText(s string) string  { return deployStages[s] }
 func reasonText(s string) string { return deployReasons[s] }
+
+// deployAdminLinks — цели, у которых выкатка не заканчивает дело сама.
+//
+// chillhub-installer — единственный сегодня пример: publish-file.sh кладёт
+// сборку на сервер, но канал самообновления лаунчера (SELFUPDATE_URL) на неё
+// НЕ переключается — решение «теперь обновляемся на эту версию» осознанно
+// оставлено человеку (см. комментарий у SELFUPDATE_URL в
+// chillhub/.deploy-kit/installer.env). Без прямой ссылки это решение легко
+// забыть: релиз в чате выглядит завершённым, а переключатель ждёт в другой
+// вкладке, о которой напоминает только память.
+//
+// Ключ — App из события (id цели), а не Project: одна и та же цель под
+// разными App не бывает у одного проекта, но Project мог бы совпасть у двух
+// репозиториев случайно. Ссылка — константа этого бота, не берётся из
+// события: чужой писатель не может подставить сюда произвольный адрес.
+var deployAdminLinks = map[string]string{
+	"chillhub-installer": "https://launcher.samoy.love/admin/ui/admin.html#launcher",
+}
 
 // deployOutcome — одна строка единой таблицы "вид события выкатки → как о нём
 // написать": значок и глагол.
@@ -869,7 +895,7 @@ func formatDeploy(d Deploy) string {
 		return formatEvent(Event{
 			Kind: KindRelease, Title: deployName(d), URL: d.URL, Project: d.Project,
 			Version: d.Version, Previous: d.Previous, CommitURL: d.CommitURL,
-			Changelog: d.Changelog, At: d.At,
+			Changelog: d.Changelog, At: d.At, AdminURL: deployAdminLinks[d.App],
 		})
 	}
 	// started молчит, даже если он — единственная цель прогона: рассказывать
@@ -970,6 +996,17 @@ func formatDeployGroup(project string, ds []Deploy) string {
 	}
 	if rest > 0 {
 		fmt.Fprintf(&b, "\n…и ещё %d %s", rest, pluralTargets(rest))
+	}
+	// Та же ссылка, что и в одиночном сообщении (см. deployAdminLinks) — цель
+	// не перестаёт ждать ручного переключения только потому, что приехала в
+	// одном прогоне с пятью другими.
+	for _, t := range shown {
+		if t.Kind != deploySuccess {
+			continue
+		}
+		if url := deployAdminLinks[t.App]; url != "" {
+			fmt.Fprintf(&b, "\n👉 <a href=\"%s\">переключить %s в админке</a>", esc(url), esc(deployName(t)))
+		}
 	}
 
 	if at := latestAt(targets); !at.IsZero() {
