@@ -74,7 +74,7 @@ func TestFormatStatus(t *testing.T) {
 		}},
 	}
 
-	got := formatStatus(s, now)
+	got := formatStatus(s, now, false, time.Time{})
 
 	// Сломанное разворачивается целиком: что это, для кого плохо, почему и
 	// сколько уже длится.
@@ -98,6 +98,23 @@ func TestFormatStatus(t *testing.T) {
 	}
 }
 
+func TestFormatStatusShowsMuteState(t *testing.T) {
+	// Раньше тишину нельзя было увидеть на самом экране статуса: узнать, что
+	// бот молчит, можно было только вспомнив, что сам её включил.
+	now := base
+	s := &Summary{Updated: now.Format(time.RFC3339), Overall: "operational"}
+
+	quiet := formatStatus(s, now, true, now.Add(2*time.Hour))
+	if !strings.Contains(quiet, "молчу до") {
+		t.Errorf("тишина включена, но на экране статуса это не видно:\n%s", quiet)
+	}
+
+	loud := formatStatus(s, now, false, time.Time{})
+	if strings.Contains(loud, "молчу до") {
+		t.Errorf("тишина выключена, но экран статуса говорит обратное:\n%s", loud)
+	}
+}
+
 func TestFormatStatusWarnsAboutStaleData(t *testing.T) {
 	now := base
 	s := &Summary{
@@ -106,7 +123,7 @@ func TestFormatStatusWarnsAboutStaleData(t *testing.T) {
 		Updated: now.Add(-30 * time.Minute).Format(time.RFC3339),
 		Overall: "operational",
 	}
-	got := formatStatus(s, now)
+	got := formatStatus(s, now, false, time.Time{})
 	if !strings.Contains(got, "Данные устарели") {
 		t.Errorf("нет предупреждения о несвежих данных:\n%s", got)
 	}
@@ -122,7 +139,7 @@ func TestFormatEscapesHTML(t *testing.T) {
 			Checks: []Check{{Name: "A & B", Status: "down", Error: "<script>"}},
 		}},
 	}
-	got := formatStatus(s, now)
+	got := formatStatus(s, now, false, time.Time{})
 	if strings.Contains(got, "<script>") || strings.Contains(got, "<b>взлом</b>") {
 		t.Errorf("разметка из данных попала в сообщение как есть:\n%s", got)
 	}

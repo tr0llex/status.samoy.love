@@ -71,7 +71,7 @@ func renderView(view, summaryPath string, now time.Time) (string, *Keyboard) {
 		}
 		// Проект исчез из конфига, а кнопка на него осталась в старом
 		// сообщении. Молча возвращаем на общий экран.
-		return formatStatus(s, now), statusKeyboard(s)
+		return statusText(s, now), statusKeyboard(s)
 	}
 	switch view {
 	case ViewVersions:
@@ -81,8 +81,31 @@ func renderView(view, summaryPath string, now time.Time) (string, *Keyboard) {
 	case ViewChangelog:
 		return renderChangelog(s, summaryPath, "", now)
 	default:
-		return formatStatus(s, now), statusKeyboard(s)
+		return statusText(s, now), statusKeyboard(s)
 	}
+}
+
+// statusText — экран статуса с состоянием тишины.
+//
+// Тишину раньше нельзя было увидеть на самом экране: включалась она только
+// кнопкой под уведомлением об аварии, то есть уже ПОСЛЕ того, как что-то
+// упало, а факт «бот сейчас молчит» никак не отображался. Здесь и только
+// здесь читается botState — единственный источник правды о тишине (тот же,
+// что у /quiet и у цикла уведомлений).
+func statusText(s *Summary, now time.Time) string {
+	muted, until := muteState(now)
+	return formatStatus(s, now, muted, until)
+}
+
+// muteState — тишина сейчас, под общим замком: тот же State, что меняют
+// /quiet и кнопки «Тихо 2 ч»/«До утра»/«Снова говорить».
+func muteState(now time.Time) (bool, time.Time) {
+	mu.Lock()
+	defer mu.Unlock()
+	if botState == nil {
+		return false, time.Time{}
+	}
+	return botState.Muted(now)
 }
 
 // handleCallback обрабатывает нажатие на инлайн-кнопку.
@@ -163,10 +186,25 @@ func handleAction(ctx context.Context, tg *Telegram, q *CallbackQuery, owner int
 		return false
 	}
 
-	now := time.Now().UTC()
+	text := applyMute(time.Now().UTC(), d, q.Data == ActUnmute)
+	if err := tg.SendWith(ctx, owner, text, mutedKeyboard()); err != nil {
+		log.Printf("подтверждение тишины не отправлено: %v", err)
+	}
+	return true
+}
+
+// applyMute задаёт или снимает тишину и сохраняет состояние.
+//
+// Общая точка для кнопок «Тихо 2 ч»/«До утра»/«Снова говорить» и команды
+// /quiet: раньше тишину можно было включить ТОЛЬКО кнопкой под уведомлением
+// об аварии, то есть уже после того, как что-то упало. Заранее заглушить
+// бота на плановые работы или ручную выкатку было нечем. Здесь — тот же
+// State, тот же замок и тот же текст подтверждения, что и у кнопок, лишь бы
+// не завести тишине вторую реализацию.
+func applyMute(now time.Time, d time.Duration, unmute bool) string {
 	mu.Lock()
 	var text string
-	if q.Data == ActUnmute {
+	if unmute {
 		botState.Unmute()
 		text = "🔔 Снова сообщаю о падениях"
 	} else {
@@ -179,9 +217,5 @@ func handleAction(ctx context.Context, tg *Telegram, q *CallbackQuery, owner int
 		log.Printf("состояние не сохранено: %v", err)
 	}
 	mu.Unlock()
-
-	if err := tg.SendWith(ctx, owner, text, mutedKeyboard()); err != nil {
-		log.Printf("подтверждение тишины не отправлено: %v", err)
-	}
-	return true
+	return text
 }

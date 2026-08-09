@@ -10,6 +10,11 @@ const (
 	CmdVersions  = "versions"
 	CmdIncidents = "incidents"
 	CmdChangelog = "changelog"
+	// CmdQuiet — тишина по требованию, а не только по кнопке под уже
+	// случившейся аварией: «/quiet 2h» перед плановыми работами или ручной
+	// выкаткой, «/quiet off», чтобы снять раньше срока, голый «/quiet» —
+	// посмотреть, молчит ли бот сейчас.
+	CmdQuiet = "quiet"
 )
 
 var aliases = map[string]string{
@@ -29,6 +34,8 @@ var aliases = map[string]string{
 	"changes":   CmdChangelog,
 	"cl":        CmdChangelog,
 	"c":         CmdChangelog,
+	"quiet":     CmdQuiet,
+	"q":         CmdQuiet,
 }
 
 // parseCommand достаёт команду из текста сообщения.

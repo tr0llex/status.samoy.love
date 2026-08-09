@@ -194,6 +194,7 @@ func formatHelp() string {
 		"/changelog — что менялось в последних выкатках",
 		"/changelog metro — то же по одному сервису, с историей",
 		"/incidents — последние падения",
+		"/quiet 2h — помолчать (можно 8h, off — снять раньше)",
 		"/help — эта справка",
 		"",
 		"Сам сообщу, когда что-то упадёт, поднимется или обновится.",
@@ -286,7 +287,12 @@ func overallStrip(s *Summary) string {
 // четырнадцати белых квадратов не сообщает ничего и только занимает строку.
 func hasHistory(s string) bool { return strings.ContainsAny(s, "🟩🟨🟧🟥") }
 
-func formatStatus(s *Summary, now time.Time) string {
+// muted и mutedUntil — состояние тишины. Раньше его вообще не было видно на
+// экране статуса: факт «бот сейчас молчит» знал только тот, кто сам жал
+// «Тихо 2 ч»/«До утра» и помнил об этом, а State.Muted читал только цикл
+// уведомлений. Отсюда молчание, которое забыли снять, было незаметно ровно
+// до следующей аварии.
+func formatStatus(s *Summary, now time.Time, muted bool, mutedUntil time.Time) string {
 	var b strings.Builder
 
 	// Тот же принцип, что на странице: здоровое сворачивается, сломанное
@@ -302,6 +308,9 @@ func formatStatus(s *Summary, now time.Time) string {
 		b.WriteString(down + " <b>Крупный сбой</b>")
 	default:
 		b.WriteString(degraded + " <b>Частичный сбой</b>")
+	}
+	if muted {
+		fmt.Fprintf(&b, "\n🔕 молчу до %s — /quiet off, чтобы снять раньше", fmtTime(mutedUntil))
 	}
 
 	var okCrit, totalCrit, auxBad int

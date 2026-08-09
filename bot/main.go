@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -351,7 +352,7 @@ func selfTest(ctx context.Context, tg *Telegram, owner int64, summaryPath string
 	if err != nil {
 		return err
 	}
-	if formatStatus(s, time.Now().UTC()) == "" {
+	if formatStatus(s, time.Now().UTC(), false, time.Time{}) == "" {
 		return fmt.Errorf("сводка построилась пустой: данные %s", summaryPath)
 	}
 	return tg.Ping(ctx, owner)
@@ -396,6 +397,16 @@ func handleUpdate(ctx context.Context, tg *Telegram, u Update, owner, ownerUser 
 	metrics.command(cmd)
 	log.Printf("команда /%s", cmd)
 
+	// /quiet не листает экраны, а меняет (или показывает) тишину — та же
+	// развилка, что у кнопок «Тихо 2 ч»/«До утра»/«Снова говорить» под
+	// уведомлением об аварии, только доступная ДО аварии: перед плановыми
+	// работами или ручной выкаткой глушить бота было нечем, кроме как
+	// дождаться первого падения.
+	if cmd == CmdQuiet {
+		handleQuiet(ctx, tg, owner, commandArg(u.Message.Text))
+		return
+	}
+
 	// Аргумент есть только у /changelog: «/changelog metro» — про одну цель,
 	// «/changelog» — про всё хозяйство. Остальные команды его игнорируют, как
 	// и раньше: «/status всё ли живо» — это /status.
@@ -406,6 +417,43 @@ func handleUpdate(ctx context.Context, tg *Telegram, u Update, owner, ownerUser 
 	if err := tg.SendLong(ctx, owner, text, kb); err != nil {
 		metrics.sendFailed()
 		log.Printf("ответ на /%s не отправлен: %v", cmd, err)
+	}
+}
+
+// handleQuiet отвечает на /quiet.
+//
+// Три формы: «/quiet 2h» (любая длительность, которую разбирает
+// time.ParseDuration — «2h», «30m», «8h») задаёт тишину, «/quiet off» снимает
+// её раньше срока, голый «/quiet» ничего не меняет и просто показывает,
+// молчит ли бот сейчас, — то же самое, что владелец увидел бы строкой на
+// /status, но без остального экрана.
+func handleQuiet(ctx context.Context, tg *Telegram, owner int64, arg string) {
+	arg = strings.ToLower(strings.TrimSpace(arg))
+	now := time.Now().UTC()
+
+	var text string
+	switch arg {
+	case "":
+		muted, until := muteState(now)
+		if muted {
+			text = fmt.Sprintf("🔕 Молчу до %s", fmtTime(until))
+		} else {
+			text = "🔔 Не молчу"
+		}
+	case "off":
+		text = applyMute(now, 0, true)
+	default:
+		d, err := time.ParseDuration(arg)
+		if err != nil || d <= 0 {
+			text = "Не понял длительность. Пример: <code>/quiet 2h</code>, <code>/quiet 8h</code>, <code>/quiet off</code>"
+			break
+		}
+		text = applyMute(now, d, false)
+	}
+
+	if err := tg.SendWith(ctx, owner, text, mutedKeyboard()); err != nil {
+		metrics.sendFailed()
+		log.Printf("ответ на /quiet не отправлен: %v", err)
 	}
 }
 
