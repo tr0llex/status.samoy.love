@@ -854,7 +854,7 @@ func TestОдиночнаяЦельДаётПрежнююФормуРелиза(
 	if got != want {
 		t.Errorf("одиночная цель дала не прежнюю форму:\nожидали %q\nполучили %q", want, got)
 	}
-	for _, trace := range []string{"выкачена", "выкатывается"} {
+	for _, trace := range []string{"выкачен", "выкатывается"} {
 		if strings.Contains(got, trace) {
 			t.Errorf("в одиночном сообщении остался след группировки (%q):\n%s", trace, got)
 		}
@@ -907,10 +907,10 @@ func TestСообщениеПрогонаПечатаетИзмененияОд�
 	// Цели — строками с исходом. Каждая ровно одна: цель, объявившая о себе
 	// дважды, занимает одну строку, а не две.
 	for _, want := range []string{
-		"Сайт</a> — выкачена",
-		"Лаунчер</a> — выкачена",
-		"API</a> — провалена на стадии: службы systemd",
-		"Админка</a> — откачена — healthcheck не дождался ответа",
+		"Сайт</a> — выкачен",
+		"Лаунчер</a> — выкачен",
+		"API</a> — не выкачен — остановились на стадии: службы systemd",
+		"Админка</a> — откачен автоматически — причина: healthcheck не дождался ответа",
 		"Бот</a> — выкатывается…",
 	} {
 		if n := strings.Count(got, want); n != 1 {
@@ -936,7 +936,7 @@ func TestСообщениеПрогонаРастётПоМереГотовно�
 	run := chillhubRun()
 	for n := 3; n <= len(run); n++ {
 		got := formatDeployGroup("ChillHub", run[:n])
-		if !strings.Contains(got, "Лаунчер</a> — выкачена") {
+		if !strings.Contains(got, "Лаунчер</a> — выкачен") {
 			t.Errorf("на %d событиях исчезла уже объявленная цель:\n%s", n, got)
 		}
 		if c := strings.Count(got, "<b>Изменения</b>"); c != 1 {
@@ -949,8 +949,8 @@ func TestСообщениеПрогонаРастётПоМереГотовно�
 	late := append(chillhubRun(), Deploy{
 		Kind: deployStarted, App: "chillhub-launcher", Title: "Лаунчер", At: base,
 	})
-	if got := formatDeployGroup("ChillHub", late); !strings.Contains(got, "Лаунчер — выкачена") &&
-		!strings.Contains(got, "Лаунчер</a> — выкачена") {
+	if got := formatDeployGroup("ChillHub", late); !strings.Contains(got, "Лаунчер — выкачен") &&
+		!strings.Contains(got, "Лаунчер</a> — выкачен") {
 		t.Errorf("запоздавший started откатил исход цели назад:\n%s", got)
 	}
 }
@@ -966,7 +966,7 @@ func TestЧислоЦелейВСообщенииОграничено(t *testing
 		})
 	}
 	got := formatDeployGroup("Хозяйство", ds)
-	if n := strings.Count(got, "— выкачена"); n != deployTargets {
+	if n := strings.Count(got, "— выкачен"); n != deployTargets {
 		t.Errorf("строк целей %d, предел %d:\n%s", n, deployTargets, got)
 	}
 	// Молчать про отброшенное нельзя: обрезанный список читается как полный.
