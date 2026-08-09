@@ -238,3 +238,29 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # Переименование или слияние задачи выше не ломает сам прогон — он остаётся
+  # зелёным, — а ломает защиту ветки: она хранит СТАРЫЕ имена, ждёт их вечно,
+  # и PR не мержится без единого красного шага, объясняющего причину. Поломка
+  # отложенная: видно её не в момент переименования, а на следующем PR, когда
+  # «Merge» неактивен без объяснения. Эта задача сверяет фактические имена
+  # задач текущего прогона (через GitHub Jobs API) со списком
+  # required_status_checks.contexts ветки main и падает при расхождении в
+  # любую сторону — пропавшая проверка или новая незащищённая.
+  protection-sync:
+    name: Защита ветки соответствует задачам CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Сверить задачи с обязательными проверками main
+        env:
+          # GITHUB_TOKEN не годится: у него нет права "administration",
+          # которым читается защита ветки. Нужен fine-grained PAT с
+          # Administration:Read-only + Actions:Read-only.
+          GH_TOKEN: ${{ secrets.PROTECTION_READ_TOKEN }}
+          # Эта задача не может требовать защиты самой себя на первом
+          # прогоне — защита её ещё не видела. Имя вычитается из «лишних».
+          SELF_JOB_NAME: Защита ветки соответствует задачам CI
+        run: bash ci/branch-protection-check.sh
