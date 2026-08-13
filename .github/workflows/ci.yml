@@ -265,15 +265,28 @@ jobs:
       - conformance
       - e2e
     if: always()
+    env:
+      # GITHUB_TOKEN не годится: у него нет права "administration",
+      # которым читается защита ветки. Нужен fine-grained PAT с
+      # Administration:Read-only + Actions:Read-only.
+      GH_TOKEN: ${{ secrets.PROTECTION_READ_TOKEN }}
     steps:
+      # Секреты репозитория не отдаются прогонам dependabot и форков — там
+      # PAT приходит пустым. Сверять нечего: задача проверяет настройку
+      # репозитория, а не содержимое PR, и на своих ветках отработает та же
+      # проверка. Падать здесь — значит красить чужие PR за то, чего они не
+      # ломали, поэтому пропускаем явно и вслух.
+      - name: Пропустить сверку без доступа к защите ветки
+        if: env.GH_TOKEN == ''
+        run: |
+          echo "::notice::PAT недоступен (dependabot или форк) — сверка защиты ветки пропущена"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.GH_TOKEN != ''
 
       - name: Сверить задачи с обязательными проверками main
+        if: env.GH_TOKEN != ''
         env:
-          # GITHUB_TOKEN не годится: у него нет права "administration",
-          # которым читается защита ветки. Нужен fine-grained PAT с
-          # Administration:Read-only + Actions:Read-only.
-          GH_TOKEN: ${{ secrets.PROTECTION_READ_TOKEN }}
           # Эта задача не может требовать защиты самой себя на первом
           # прогоне — защита её ещё не видела. Имя вычитается из «лишних».
           SELF_JOB_NAME: Защита ветки соответствует задачам CI
