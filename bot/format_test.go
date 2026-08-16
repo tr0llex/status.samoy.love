@@ -1022,20 +1022,19 @@ func TestЧислоЦелейВСообщенииОграничено(t *testing
 }
 
 func TestПродВсегдаПервымНезависимоОтПорядкаВыкатки(t *testing.T) {
-	// Nightly едет первым по построению выкатки (docs/DEPLOY.md), и его успех
-	// доезжает до бота раньше прода. Раньше карточка печатала цели в порядке
-	// прихода — прод оказывался в ней вторым всегда. Прод узнаётся по тому же
-	// правилу, что и во всём хозяйстве: APP совпадает с id проекта.
-	nightly := Deploy{
-		Kind: deploySuccess, App: "die-dev", Project: "die", Title: "Double or Die · Nightly",
-		URL: "https://dev.die.samoy.love/", Version: "release-1", At: base,
+	// Вторичная цель бывает легче прода и отчитывается раньше. Карточка,
+	// печатающая цели в порядке прихода, ставила бы прод вторым. Прод узнаётся
+	// по тому же правилу, что и во всём хозяйстве: APP совпадает с id проекта.
+	editor := Deploy{
+		Kind: deploySuccess, App: "metro-editor", Project: "metro", Title: "Метро · Редактор",
+		URL: "https://metro.samoy.love/editor/", Version: "release-1", At: base,
 	}
 	prod := Deploy{
-		Kind: deploySuccess, App: "die", Project: "die", Title: "Double or Die",
-		URL: "https://die.samoy.love/", Version: "release-1", At: base.Add(time.Minute),
+		Kind: deploySuccess, App: "metro", Project: "metro", Title: "Метро",
+		URL: "https://metro.samoy.love/", Version: "release-1", At: base.Add(time.Minute),
 	}
-	got := formatDeployGroup("Double or Die", []Deploy{nightly, prod})
-	if i, j := strings.Index(got, "Double or Die<"), strings.Index(got, "Nightly<"); i == -1 || j == -1 || i > j {
+	got := formatDeployGroup("Метро", []Deploy{editor, prod})
+	if i, j := strings.Index(got, "Метро<"), strings.Index(got, "Редактор<"); i == -1 || j == -1 || i > j {
 		t.Errorf("прод не первым в карточке прогона:\n%s", got)
 	}
 }
