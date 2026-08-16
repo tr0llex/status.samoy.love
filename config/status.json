@@ -185,21 +185,8 @@
           "critical": false,
           "slowMs": 2000,
           "expectType": "javascript"
-        },
-        {
-          "id": "die-dev",
-          "name": "Nightly",
-          "note": "Сборка из main, на которой ловят то, что не поймал CI",
-          "impact": "Проверять новую сборку до игроков негде. Самих игроков не затрагивает",
-          "url": "https://dev.die.samoy.love/",
-          "expect": 200,
-          "critical": false,
-          "slowMs": 3000,
-          "expectType": "text/html",
-          "bodyIncludes": "</html>"
         }
       ],
-      "//builds": "Только прод. Nightly едет с того же коммита, и вторая запись означала бы два сообщения о релизе об одном и том же — а голос о релизах здесь один. Доступность nightly при этом проверяется, см. check die-dev.",
       "builds": [
         {
           "title": "Игра",
