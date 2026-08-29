@@ -7,6 +7,11 @@ version: 2
 # open-pull-requests-limit держит очередь короткой намеренно. Двадцать
 # открытых PR от бота — это не двадцать обновлений, а ноль.
 #
+# groups: минорные и патчевые обновления каждой экосистемы едут одним PR.
+# Поштучно их выходило до пяти в неделю на экосистему, и каждый мерж — это
+# отдельная выкатка прода и отдельное сообщение в чат ради поднятой цифры в
+# lock-файле. Мажорные остаются поштучно: они ломают, их читают по одному.
+#
 # Сообщения на русском в повелительном наклонении, как везде в этих
 # репозиториях (CLAUDE.md). Префикс deps: отделяет машинные правки от
 # человеческих.
@@ -20,6 +25,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'deps'
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
@@ -28,6 +36,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'deps'
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
     ignore:
       # TypeScript 7 не встаёт, пока его не поддержит typescript-eslint: тот
       # объявляет peer typescript ">=4.8.4 <6.1.0", и npm ci падает на
@@ -46,6 +57,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'deps'
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
   - package-ecosystem: 'gomod'
     directory: '/bot'
     schedule:
@@ -54,3 +68,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'deps'
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']

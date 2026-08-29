@@ -198,7 +198,14 @@ jobs:
     with:
       config: .deploy-kit/agent.env
       workdir: agent
-      gates: go vet ./... && go test ./... -race -coverprofile=coverage.out -covermode=atomic
+      # Полный `go test ./... -race` с покрытием сюда не входит: тот же
+      # прогон уже прошёл в ci.yml на этом дереве — pull_request считает
+      # проверки на результате слияния с main (см. комментарий у триггера
+      # ci.yml), так что коммит, доехавший до main, уже проверен. Гонять
+      # тесты второй раз на каждый мерж — не надёжность, а то же ожидание
+      # ещё раз, причём перед самым переключением прода. Здесь остаётся
+      # дешёвая проверка, что дерево собирается: секунды, не минуты.
+      gates: go vet ./... && go build ./...
       dry-run: ${{ inputs.dry-run == true }}
     secrets: inherit
 
@@ -217,7 +224,14 @@ jobs:
     with:
       config: .deploy-kit/bot.env
       workdir: bot
-      gates: go vet ./... && go test ./... -race -coverprofile=coverage.out -covermode=atomic
+      # Полный `go test ./... -race` с покрытием сюда не входит: тот же
+      # прогон уже прошёл в ci.yml на этом дереве — pull_request считает
+      # проверки на результате слияния с main (см. комментарий у триггера
+      # ci.yml), так что коммит, доехавший до main, уже проверен. Гонять
+      # тесты второй раз на каждый мерж — не надёжность, а то же ожидание
+      # ещё раз, причём перед самым переключением прода. Здесь остаётся
+      # дешёвая проверка, что дерево собирается: секунды, не минуты.
+      gates: go vet ./... && go build ./...
       dry-run: ${{ inputs.dry-run == true }}
     secrets: inherit
 
