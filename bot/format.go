@@ -600,9 +600,7 @@ func formatEvent(e Event) string {
 		// длинный, самый необязательный и единственный, которого может не
 		// быть. Всё, ради чего уведомление читают в первую очередь (что
 		// обновилось и до какой версии), остаётся выше и на прежнем месте.
-		if cl := formatChangelog(e.Changelog, repoFromCommitURL(e.CommitURL)); cl != "" {
-			s += "\n\n" + cl
-		}
+		s += changelogTail(e.Changelog, repoFromCommitURL(e.CommitURL), e.Previous, e.CommitURL)
 		return s
 
 	default:
@@ -979,10 +977,23 @@ func formatDeployGroup(project string, ds []Deploy) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s <b>%s</b>", iconShip, head)
-	// Версия в шапке — та, которую катят, а не та, на которую откатывают:
-	// прогон называется по тому, что в нём выкатывалось.
-	if v, commit := runVersion(targets); v != "" {
+	// ВЕРСИЯ В ШАПКЕ — ТОЛЬКО ЕСЛИ ОНА ОДНА НА ВЕСЬ ПРОГОН.
+	//
+	// Здесь стояла версия ПЕРВОЙ отчитавшейся цели, и она приклеивалась ко
+	// всем остальным. У целей одного прогона версии разные: метку
+	// release-<дата>-<время>-<sha> каждая задача считает сама, и совпадает в
+	// них только sha. Карточка chillhub от 22.08 объявляла пять целей под
+	// версией одной из них, хотя настоящие были …-105949, …-110126, …-110316
+	// и 1.5.29.
+	//
+	// Общее у прогона — КОММИТ: пуш один. Его и показываем, когда версии
+	// разошлись, а сами версии уходят в строки целей, где каждая своя.
+	// Совпали (одна цель, или все посчитали одну секунду) — шапка прежняя.
+	sameVer := sameRunVersion(targets)
+	if v, commit := runVersion(targets); v != "" && sameVer {
 		b.WriteString(" · " + versionHTML(v, commit))
+	} else if c := runCommitHTML(targets); c != "" {
+		b.WriteString(" · " + c)
 	}
 	b.WriteString("\n")
 
@@ -993,6 +1004,12 @@ func formatDeployGroup(project string, ds []Deploy) string {
 	}
 	for _, t := range shown {
 		fmt.Fprintf(&b, "\n%s %s — %s", outcomeIcon(t), link(deployName(t), t.URL), outcomeText(t))
+		// Версия цели — здесь, если шапка её не показала: иначе прогон из пяти
+		// целей не сказал бы про четыре из них, какой релиз на них уехал, — а
+		// именно это имя нужно для `dk rollback`.
+		if !sameVer && t.Version != "" {
+			b.WriteString(" · <code>" + esc(t.Version) + "</code>")
+		}
 	}
 	if rest > 0 {
 		fmt.Fprintf(&b, "\n…и ещё %d %s", rest, pluralTargets(rest))
@@ -1014,9 +1031,8 @@ func formatDeployGroup(project string, ds []Deploy) string {
 	}
 	// Список изменений — ОДИН РАЗ на прогон и последним блоком, ровно как в
 	// сообщении об одной цели.
-	if cl := formatChangelog(runChangelog(targets), runRepoURL(targets)); cl != "" {
-		b.WriteString("\n\n" + cl)
-	}
+	prev, commitURL := runCompare(targets)
+	b.WriteString(changelogTail(runChangelog(targets), runRepoURL(targets), prev, commitURL))
 	return b.String()
 }
 
@@ -1048,6 +1064,9 @@ func deployOutcomes(ds []Deploy) []Deploy {
 		// стереть уже объявленный итог.
 		if seen && d.Kind == deployStarted && prev.Kind != deployStarted {
 			continue
+		}
+		if seen {
+			d = mergeDeploy(prev, d)
 		}
 		byApp[key] = d
 	}
@@ -1104,6 +1123,107 @@ func runVersion(ds []Deploy) (version, commitURL string) {
 		return d.Version, d.CommitURL
 	}
 	return "", ""
+}
+
+// sameRunVersion — одна ли версия у всех целей прогона.
+//
+// Откат в счёт не идёт: у него Version — это релиз, НА который вернулись
+// (контракт, §4), и сравнивать его с выкатываемыми версиями нечего.
+func sameRunVersion(ds []Deploy) bool {
+	first := ""
+	for _, d := range ds {
+		if d.Kind == deployRollback || d.Version == "" {
+			continue
+		}
+		if first == "" {
+			first = d.Version
+			continue
+		}
+		if d.Version != first {
+			return false
+		}
+	}
+	return true
+}
+
+// runCommitHTML — коммит прогона ссылкой и коротким sha.
+//
+// Пуш один на весь прогон, поэтому коммит — единственное, что у целей общее и
+// в шапке не соврёт. Показывается семь знаков: длиннее в заголовке не нужно, а
+// ведёт ссылка на полный адрес.
+func runCommitHTML(ds []Deploy) string {
+	for _, d := range ds {
+		if !commitURLRe.MatchString(d.CommitURL) {
+			continue
+		}
+		_, sha, ok := strings.Cut(d.CommitURL, "/commit/")
+		if !ok || len(sha) < 7 {
+			continue
+		}
+		return `<a href="` + esc(d.CommitURL) + `">` + esc(sha[:7]) + `</a>`
+	}
+	return ""
+}
+
+// runCompare — пара «прошлый релиз, коммит этого» для ссылки на сравнение.
+//
+// Берётся первая цель, у которой есть обе половины. Порядок целей здесь не
+// случайный: deployOutcomes ставит прод первым, то есть ссылка описывает ту
+// цель, ради которой карточку и читают.
+func runCompare(ds []Deploy) (previous, commitURL string) {
+	for _, d := range ds {
+		if d.Kind == deployRollback || d.Previous == "" || d.CommitURL == "" {
+			continue
+		}
+		return d.Previous, d.CommitURL
+	}
+	return "", ""
+}
+
+// mergeDeploy склеивает два события ОДНОЙ цели одного прогона.
+//
+// Событий об одной выкатке приезжает два, и они дополняют друг друга, а не
+// повторяют. Пайплайн знает адрес коммита, список изменений и адрес прогона;
+// release.sh на сервере знает то, чего пайплайн знать не может, — на какой
+// релиз в действительности показывал симлинк до переключения (previous) и чем
+// закончился автооткат. Раньше сюда доезжало только последнее событие, и
+// карточка теряла половину: «была …» или список изменений, смотря что пришло
+// вторым.
+//
+// Правило простое: НОВОЕ событие главнее в том, что описывает исход (вид,
+// время, стадия, причина), а поля-факты подхватываются у прежнего, если новое
+// их не принесло. Затирать непустое пустым нельзя ни в одном поле — это и есть
+// та потеря, ради которой функция заведена.
+func mergeDeploy(prev, next Deploy) Deploy {
+	out := next
+	if out.Title == "" {
+		out.Title = prev.Title
+	}
+	if out.URL == "" {
+		out.URL = prev.URL
+	}
+	if out.Project == "" {
+		out.Project = prev.Project
+	}
+	if out.Version == "" {
+		out.Version = prev.Version
+	}
+	if out.Previous == "" {
+		out.Previous = prev.Previous
+	}
+	if out.CommitURL == "" {
+		out.CommitURL = prev.CommitURL
+	}
+	if out.RunURL == "" {
+		out.RunURL = prev.RunURL
+	}
+	if len(out.Changelog) == 0 {
+		out.Changelog = prev.Changelog
+	}
+	if out.At.IsZero() {
+		out.At = prev.At
+	}
+	return out
 }
 
 // runChangelog — список изменений прогона. Тоже первый непустой: он общий для
@@ -1201,6 +1321,91 @@ const (
 	// обязан. Пятьсот — впятеро больше того, что кладёт агент.
 	changelogScan = 500
 )
+
+// ------------------------------------------------- «а что, собственно, уехало»
+
+// releaseVersionRe — имя релиза deploy-kit: release-<дата>-<время>-<sha> или
+// manual-… . Шаблон узкий намеренно: из версии достаётся КОММИТ, и принять за
+// него хвост чужой схемы («1.5.28», «20260822») значит построить ссылку в
+// никуда. Ссылка в никуда хуже её отсутствия: отсутствие видно сразу, а
+// неверная — только по клику.
+var releaseVersionRe = regexp.MustCompile(`^(?:release|manual)-[0-9]{8}-[0-9]{6}-([0-9a-f]{7,40})$`)
+
+// commitOfVersion — короткий sha из имени релиза; пусто, если схема другая.
+func commitOfVersion(v string) string {
+	m := releaseVersionRe.FindStringSubmatch(v)
+	if m == nil {
+		return ""
+	}
+	return m[1]
+}
+
+// compareHTML — ссылка «посмотреть, что именно уехало».
+//
+// Сообщение о релизе называет версию и перечисляет темы коммитов, но проверить
+// их было негде: тема — это то, что автор НАПИСАЛ, а не то, что он изменил.
+// Ссылка на коммит показывает один коммит, а релиз почти всегда несёт больше.
+// Диапазон «прошлый релиз → этот» — единственное место, где видно всё
+// изменение целиком, и GitHub умеет показать его одним адресом.
+//
+// Обе половины диапазона у бота уже есть и обе проверены: previous — имя
+// прошлого релиза из события сервера (только он знает, на что показывал
+// симлинк до переключения), текущий коммит — из commitURL, который проходит
+// commitURLRe. Ничего чужого в адрес не подставляется: repoURL получен из того
+// же проверенного commitURL.
+//
+// Пусто — обычный исход, а не ошибка: у первой выкатки цели нет previous, у
+// цели-файла версия своя и sha в ней нет вовсе.
+func compareHTML(repoURL, previous, commitURL string) string {
+	if repoURL == "" {
+		return ""
+	}
+	prev := commitOfVersion(previous)
+	if prev == "" || !commitURLRe.MatchString(commitURL) {
+		return ""
+	}
+	_, cur, ok := strings.Cut(commitURL, "/commit/")
+	if !ok || cur == "" {
+		return ""
+	}
+	// Диапазон в одну точку показывать нечего: прод уже стоит на этом коммите.
+	if strings.HasPrefix(cur, prev) {
+		return ""
+	}
+	return `<a href="` + esc(repoURL+"/compare/"+prev+"..."+cur) + `">сравнить с предыдущим релизом</a>`
+}
+
+// changelogTail — общий хвост сообщения о релизе: список изменений и ссылка,
+// по которой его можно проверить.
+//
+// ПУСТОЙ СПИСОК ТЕПЕРЬ НАЗЫВАЕТСЯ ВСЛУХ. Раньше блока «Изменения» просто не
+// было, и три разных случая выглядели одинаково: изменений действительно нет;
+// все коммиты отфильтрованы как шум (подъёмы версий, dependabot); генератор не
+// отработал. Это ровно тот дефект, от которого предостерегает сам генератор:
+// «пусто и непонятно почему» читается как «всё в порядке».
+//
+// Случай стал ЧАЩЕ после того, как список начали считать по путям цели
+// (CHANGELOG_PATHS): цель, поехавшая в составе прогона и не менявшаяся сама,
+// честно даёт пустой список. Раньше она показывала чужие коммиты — неправду,
+// но заметную.
+//
+// Утверждение при этом подкреплено ссылкой: рядом с «изменений нет» стоит
+// диапазон, по которому это видно. Бот не знает, почему список пуст, и не
+// делает вид, что знает, — он даёт читателю проверить за один клик.
+func changelogTail(lines []string, repoURL, previous, commitURL string) string {
+	cl := formatChangelog(lines, repoURL)
+	cmp := compareHTML(repoURL, previous, commitURL)
+	switch {
+	case cl != "" && cmp != "":
+		return "\n\n" + cl + "\n" + cmp
+	case cl != "":
+		return "\n\n" + cl
+	case cmp != "":
+		return "\n\n<i>изменений в этом релизе нет</i> · " + cmp
+	default:
+		return "\n\n<i>изменений в этом релизе нет</i>"
+	}
+}
 
 // formatChangelog собирает блок «Изменения» из простых текстовых строк.
 //

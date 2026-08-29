@@ -168,8 +168,10 @@ func TestСоставСообщенияОРелизеЧитаемЦеликом(
 	want := "🚀 <b><a href=\"https://status.samoy.love/\">Статус · Страница</a></b> обновлён\n" +
 		"<a href=\"" + relCommit + "\">" + relVersion + "</a>\n" +
 		"была <code>release-20260802-090000-def5678</code>\n" +
-		"<i>собрано " + fmtTime(e.At) + "</i>\n\n" +
-		formatChangelog(e.Changelog, "")
+		"<i>собрано " + fmtTime(e.At) + "</i>" +
+		// Хвост целиком: список изменений и ссылка на диапазон, по которому его
+		// можно проверить. Обе половины ссылки у события есть и обе проверены.
+		changelogTail(e.Changelog, repoFromCommitURL(e.CommitURL), e.Previous, e.CommitURL)
 
 	if got := formatEvent(e); got != want {
 		t.Errorf("сообщение о релизе изменилось:\nожидали %q\nполучили %q", want, got)
