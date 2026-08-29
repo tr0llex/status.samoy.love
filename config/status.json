@@ -23,18 +23,6 @@
           "cert": "launcher.samoy.love"
         },
         {
-          "id": "launcher-api",
-          "name": "API манифестов",
-          "note": "Через него лаунчер узнаёт о новых версиях",
-          "impact": "Установленные лаунчеры не увидят новых версий и не смогут обновиться",
-          "url": "https://launcher.samoy.love/manifests/launcher/latest.json",
-          "expect": 200,
-          "critical": true,
-          "slowMs": 2000,
-          "expectType": "json",
-          "bodyIncludes": "\"version\""
-        },
-        {
           "id": "launcher-build",
           "name": "Путь обновления клиента",
           "note": "Два шага подряд: узнать последнюю версию и забрать её манифест",
@@ -46,6 +34,7 @@
               "name": "последняя версия",
               "url": "https://launcher.samoy.love/manifests/launcher/latest.json",
               "expect": 200,
+              "expectType": "json",
               "capture": {
                 "version": "version"
               }
