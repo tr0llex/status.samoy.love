@@ -1031,8 +1031,17 @@ func formatDeployGroup(project string, ds []Deploy) string {
 	}
 	// Список изменений — ОДИН РАЗ на прогон и последним блоком, ровно как в
 	// сообщении об одной цели.
-	prev, commitURL := runCompare(targets)
-	b.WriteString(changelogTail(runChangelog(targets), runRepoURL(targets), prev, commitURL))
+	// Хвост со списком изменений — только если в прогоне что-то ВЫКАТИЛОСЬ.
+	//
+	// Строка «изменений в этом релизе нет» описывает релиз, а у прогона, где
+	// все цели провалились, релиза не было вовсе: там она читалась бы как
+	// «выкатили пустоту», хотя не выкатили ничего.
+	if runHasSuccess(targets) {
+		prev, commitURL := runCompare(targets)
+		b.WriteString(changelogTail(runChangelog(targets), runRepoURL(targets), prev, commitURL))
+	} else if cl := formatChangelog(runChangelog(targets), runRepoURL(targets)); cl != "" {
+		b.WriteString("\n\n" + cl)
+	}
 	return b.String()
 }
 
@@ -1914,4 +1923,17 @@ func link(text, url string) string {
 		return esc(text)
 	}
 	return fmt.Sprintf(`<a href="%s">%s</a>`, esc(url), esc(text))
+}
+
+// runHasSuccess — выкатилась ли в прогоне хоть одна цель.
+//
+// Нужно ровно одному месту: строке «изменений в этом релизе нет». Она говорит
+// о релизе, а у прогона, где всё провалилось, релиза не было.
+func runHasSuccess(ds []Deploy) bool {
+	for _, d := range ds {
+		if d.Kind == deploySuccess {
+			return true
+		}
+	}
+	return false
 }

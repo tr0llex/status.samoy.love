@@ -144,3 +144,18 @@ func TestПустойСписокИзмененийНеМолчит(t *testing.T
 		t.Errorf("при непустом списке строки про «нет» быть не должно: %q", full)
 	}
 }
+
+// Прогон, где всё провалилось, релизом не был — и про «изменений нет» молчит.
+func TestПровалившийсяПрогонНеГоворитПроОтсутствиеИзменений(t *testing.T) {
+	at := time.Date(2026, 8, 22, 8, 0, 0, 0, time.UTC)
+	mk := func(app string) Deploy {
+		return Deploy{
+			Kind: deployFailure, App: app, Title: app, URL: "https://samoy.love/",
+			Stage: "gates", At: at,
+		}
+	}
+	got := formatDeployGroup("Статус", []Deploy{mk("status-site"), mk("status-agent")})
+	if strings.Contains(got, "изменений в этом релизе нет") {
+		t.Errorf("у прогона без единой выкатки релиза не было — строка лишняя:\n%s", got)
+	}
+}
