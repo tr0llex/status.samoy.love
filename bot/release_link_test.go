@@ -75,27 +75,6 @@ func TestШапкаПрогонаНеПриклеиваетВерсиюОдно�
 	}
 }
 
-// Одна версия на весь прогон — шапка прежняя, версий в строках нет.
-func TestОдинаковыеВерсииОстаютсяВШапке(t *testing.T) {
-	at := time.Date(2026, 8, 22, 8, 0, 0, 0, time.UTC)
-	mk := func(app string) Deploy {
-		return Deploy{
-			Kind: deploySuccess, App: app, Title: app, URL: "https://samoy.love/",
-			Version:   "release-20260822-094221-f328bc5",
-			CommitURL: "https://github.com/tr0llex/status.samoy.love/commit/f328bc5",
-			At:        at,
-		}
-	}
-	got := formatDeployGroup("Статус", []Deploy{mk("status-site"), mk("status-agent")})
-	head, _, _ := strings.Cut(got, "\n")
-	if !strings.Contains(head, "release-20260822-094221-f328bc5") {
-		t.Errorf("общая версия обязана остаться в шапке:\n%s", head)
-	}
-	if strings.Count(got, "release-20260822-094221-f328bc5") != 1 {
-		t.Errorf("версию не надо повторять в строках, когда она одна:\n%s", got)
-	}
-}
-
 func TestСсылкаНаСравнениеСтроитсяТолькоИзПроверенного(t *testing.T) {
 	const repo = "https://github.com/tr0llex/metro-map"
 	const commit = repo + "/commit/a590514"

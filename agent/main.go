@@ -54,8 +54,35 @@ const (
 
 // ------------------------------------------------------------------ конфиг
 
+// DeployTarget — как называть цель выкатки в сообщении о релизе.
+//
+// Имя цели в событии выкатки — это её id (chillhub-api, samoylove-bot), и
+// показывать его владельцу нельзя: в чате должно стоять то же имя, что на
+// странице. Реестр для этого и существует, но собирался он только из проверок
+// и проектов, а id цели выкатки совпадает с ними лишь по случайности — у
+// метро и змеек совпал, у всех целей лаунчера нет. В ленте это выглядело как
+// «🚀 chillhub-api» без ссылки, да ещё и в шапке карточки прогона, названной
+// произвольной целью.
+//
+// Таблица заводится ЯВНОЙ, а не выводится из пути релиза: путь — это
+// подробность установки, и завязывать на неё имя в чате значит переименовать
+// цель первым же переездом каталога.
+type DeployTarget struct {
+	// Project — id проекта из projects. По нему цель получает имя проекта в
+	// шапке карточки и адрес, если своего у неё нет.
+	Project string `json:"project"`
+	// Title — короткое имя цели: «Публичный API», «Установщик». Имя проекта
+	// приписывается к нему читателем, второй раз писать его здесь не нужно.
+	Title string `json:"title"`
+	// URL — что открывать по имени цели. Пусто — адрес проекта.
+	URL string `json:"url,omitempty"`
+}
+
 type Config struct {
 	Projects []Project `json:"projects"`
+	// Цели выкатки: id из события → как её называть. Ключей может не быть
+	// вовсе — тогда цель покажется своим id, как и до появления таблицы.
+	DeployTargets map[string]DeployTarget `json:"deployTargets,omitempty"`
 }
 
 type Project struct {
@@ -372,6 +399,10 @@ type Summary struct {
 	Overall   string       `json:"overall"`
 	Projects  []OutProject `json:"projects"`
 	Incidents []Incident   `json:"incidents"`
+	// Таблица имён целей выкатки переносится из конфигурации как есть: агент
+	// её не считает и не проверяет, он только доносит её до бота — тот
+	// единственный, кому она нужна.
+	DeployTargets map[string]DeployTarget `json:"deployTargets,omitempty"`
 }
 
 // ------------------------------------------------------------------ утилиты
@@ -1581,7 +1612,7 @@ func main() {
 		}
 	}
 
-	out := Summary{Updated: now.Format(time.RFC3339)}
+	out := Summary{Updated: now.Format(time.RFC3339), DeployTargets: cfg.DeployTargets}
 	names := map[string]string{}
 	for _, p := range cfg.Projects {
 		op := OutProject{

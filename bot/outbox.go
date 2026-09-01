@@ -34,6 +34,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -499,14 +500,15 @@ func (o *outbox) deliver(ctx context.Context, it outboxItem) (*groupRecord, erro
 	}
 	view := groupViewOf(it, next)
 	text := o.render(view)
-	err := o.tg.EditLong(ctx, o.chatID, next.MessageID, text, o.keyboardFor(view))
+	err := o.editGroup(ctx, next.MessageID, text, view)
 	if err == nil {
 		return next, nil
 	}
-	// Правка не удалась: карточку прогона удалили руками, Telegram отказал,
-	// сообщение слишком старое. Молчать тут недопустимо — цель выкачена, а в
-	// чате об этом не сказано. Шлём новым сообщением и перепривязываем
-	// message_id: лишнее сообщение переживём, потерянное уведомление — нет.
+	// Правка не удалась окончательно: карточку прогона удалили руками,
+	// сообщение слишком старое, Telegram лежит дольше наших повторов. Молчать
+	// тут недопустимо — цель выкачена, а в чате об этом не сказано. Шлём новым
+	// сообщением и перепривязываем message_id: лишнее сообщение переживём,
+	// потерянное уведомление — нет.
 	o.log("правка сообщения прогона не удалась, шлю новым: %v", err)
 	next.At = o.now()
 	id, sendErr := o.tg.SendGroup(ctx, o.chatID, text, o.keyboardFor(view))
@@ -609,11 +611,59 @@ func targetOf(it outboxItem) groupTarget {
 func (g *groupRecord) upsert(t groupTarget) {
 	for i := range g.Targets {
 		if g.Targets[i].App == t.App {
-			g.Targets[i] = t
+			g.Targets[i] = mergeTarget(g.Targets[i], t)
 			return
 		}
 	}
 	g.Targets = append(g.Targets, t)
+}
+
+// mergeTarget склеивает два события ОДНОЙ цели одного прогона.
+//
+// СКЛЕИВАТЬ НАДО ЗДЕСЬ, А НЕ У ФОРМАТТЕРА. Строка цели живёт в состоянии, и
+// пока здесь стояло `g.Targets[i] = t`, до форматтера доезжало только
+// последнее событие — остальное стиралось до того, как его кто-либо увидел.
+//
+// А событий об одной выкатке приезжает два, и они дополняют друг друга:
+// пайплайн знает адрес коммита, список изменений и адрес прогона; release.sh
+// на сервере знает то, чего пайплайн знать не может, — на какой релиз
+// показывал симлинк до переключения. Порядок между ними не гарантирован:
+// сервер обычно на секунду-две раньше.
+//
+// Живой пример из журнала (метро, 01.09):
+//
+//	04:55:45  success  src=local  previous=release-20260829-055631-ae6e43d
+//	04:55:48  success  src=ci     previous=—
+//
+// Второе стирало первое, и в чат уходил релиз без строки «была …» и без
+// ссылки на сравнение — той самой, которой подкреплена строка «изменений в
+// этом релизе нет». Утверждение оставалось, а способ его проверить пропадал.
+//
+// Правило: новое событие главнее в том, что описывает ИСХОД, а поля-факты
+// подхватываются у прежнего, если новое их не принесло. Затирать непустое
+// пустым нельзя ни в одном поле.
+func mergeTarget(prev, next groupTarget) groupTarget {
+	// ЗАПОЗДАВШИЙ started НЕ СТИРАЕТ УЖЕ ОБЪЯВЛЕННЫЙ ИСХОД. События могут
+	// доехать не по порядку (контракт, §6), и «выкачен» не имеет права
+	// откатиться в «выкатывается…». У форматтера такая проверка есть, но сюда
+	// она не успевала: строка к тому моменту была уже перезаписана.
+	if next.Kind == evStarted && prev.Kind != "" && prev.Kind != evStarted {
+		out := prev
+		out.Version = firstNonEmptyStr(prev.Version, next.Version)
+		out.Previous = firstNonEmptyStr(prev.Previous, next.Previous)
+		out.CommitURL = firstNonEmptyStr(prev.CommitURL, next.CommitURL)
+		out.RunURL = firstNonEmptyStr(prev.RunURL, next.RunURL)
+		return out
+	}
+	out := next
+	out.Version = firstNonEmptyStr(next.Version, prev.Version)
+	out.Previous = firstNonEmptyStr(next.Previous, prev.Previous)
+	out.CommitURL = firstNonEmptyStr(next.CommitURL, prev.CommitURL)
+	out.RunURL = firstNonEmptyStr(next.RunURL, prev.RunURL)
+	if out.At.IsZero() {
+		out.At = prev.At
+	}
+	return out
 }
 
 func groupViewOf(it outboxItem, rec *groupRecord) groupView {
@@ -628,4 +678,76 @@ func groupViewOf(it outboxItem, rec *groupRecord) groupView {
 		}
 	}
 	return v
+}
+
+// editRetries — паузы между попытками правки карточки прогона. Значение живёт
+// переменной, а не константой, чтобы тест не ждал наяву.
+var editRetries = []time.Duration{2 * time.Second, 5 * time.Second}
+
+// editGroup правит карточку прогона, повторяя ВРЕМЕННЫЕ отказы Telegram.
+//
+// ЗАЧЕМ ПОВТОРЫ. Не сумев поправить сообщение, отправитель шлёт новое — иначе
+// выкатка осталась бы необъявленной. Пока временный отказ и постоянный
+// обрабатывались одинаково, одна секунда недоступности Telegram превращалась в
+// ДУБЛЬ в ленте. Так и вышло 31.08:
+//
+//	01:12:38 правка не удалась, шлю новым: editMessageText: telegram отказал: Bad Gateway
+//	01:13:46 правка не удалась, шлю новым: editMessageText: context deadline exceeded
+//
+// В чате это дало два одинаковых сообщения о релизе 1.6.37 с разницей в две
+// минуты. Ни одной новой правды во втором не было.
+//
+// Таймаут клиента опаснее прочего: ответ не дошёл, но правка на стороне
+// Telegram могла и пройти — тогда «шлю новым» даёт дубль гарантированно.
+// Поэтому повтор, а не немедленный запасной путь.
+//
+// ПОСТОЯННЫЙ ОТКАЗ НЕ ПОВТОРЯЕТСЯ: карточку удалили или её нельзя править —
+// во второй раз ответ будет тот же, а пауза задержит рассказ о выкатке.
+func (o *outbox) editGroup(ctx context.Context, messageID int64, text string, view groupView) error {
+	var err error
+	for attempt := 0; ; attempt++ {
+		err = o.tg.EditLong(ctx, o.chatID, messageID, text, o.keyboardFor(view))
+		if err == nil || editIsPermanent(err) {
+			return err
+		}
+		if attempt >= len(editRetries) {
+			return err
+		}
+		o.log("правка сообщения прогона не удалась (%v) — повтор через %s", err, editRetries[attempt])
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(editRetries[attempt]):
+		}
+	}
+}
+
+// editIsPermanent — отказ, который не изменится от повтора.
+//
+// Разбор по тексту описания, потому что другого признака у Telegram нет: код
+// ответа один и тот же (200 с ok: false), а машиночитаемого кода ошибки в
+// ответе нет вовсе. Список узкий НАМЕРЕННО: всё незнакомое считается временным
+// и повторяется. Ошибиться в эту сторону дёшево — три лишние попытки; ошибиться
+// в другую значит вернуть дубль, ради устранения которого всё и написано.
+func editIsPermanent(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	for _, sig := range []string{
+		"message to edit not found",
+		"message can't be edited",
+		"message_id_invalid",
+		"chat not found",
+		"bot was blocked",
+		// «не изменилось» — это успех, переодетый в отказ: текст карточки уже
+		// такой, каким мы хотим его видеть. Повторять нечего, и слать новое
+		// сообщение тем более: оно было бы копией уже висящего.
+		"message is not modified",
+	} {
+		if strings.Contains(s, sig) {
+			return true
+		}
+	}
+	return false
 }

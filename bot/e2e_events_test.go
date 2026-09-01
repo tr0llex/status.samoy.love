@@ -508,36 +508,47 @@ func TestE2ESixTargetsOfOneRunGiveOneMessage(t *testing.T) {
 // годами, и переписать её форму заодно с транспортом значило бы сломать
 // единственное, что в этой работе и так работало. Ожидание строится через
 // formatEvent — то есть через тот самый код, который печатает релизы сегодня.
-func TestE2ESingleTargetKeepsTodaysReleaseForm(t *testing.T) {
+func TestE2EОдинаковаяКарточкаНезависимоОтЧислаЦелей(t *testing.T) {
+	// Тест назывался «одиночная цель сохраняет сегодняшнюю форму релиза» и
+	// сторожил ровно то, от чего пришлось отказаться: две разные вёрстки на
+	// один и тот же факт, выбор между которыми делало число целей в прогоне.
+	// В ленте это и читалось как отсутствие единого дизайна.
+	//
+	// Теперь проверяется обратное: прогон из одной цели и прогон из двух дают
+	// сообщения одного строения — та же шапка, те же строки целей, тот же
+	// хвост.
 	r := newE2E(t)
-	at := time.UnixMilli(e2eStart).UTC()
-	changelog := []string{"Починить обрыв скачивания больших файлов #21"}
 	r.put(e2eStart, "snakes", evSuccess, e2eRunA, 1, func(e map[string]any) {
 		e["previous"] = "release-20260804-221407-9f8e7d6"
-		e["changelog"] = []any{changelog[0]}
+		e["changelog"] = []any{"Починить обрыв скачивания больших файлов #21"}
 	})
 	if err := r.tick(); err != nil {
 		t.Fatalf("такт не прошёл: %v", err)
 	}
 	r.wantCounts("одиночная цель", 1, 0)
 
-	want := formatEvent(Event{
-		Kind:      KindRelease,
-		Title:     "snakes",
-		Version:   "release-20260805-130115-1a2b3c4",
-		Previous:  "release-20260804-221407-9f8e7d6",
-		Changelog: changelog,
-		At:        at,
-	})
-	if got := r.lastSent(); got != want {
-		t.Errorf("форма сообщения о релизе изменилась\nполучили:\n%s\nожидали:\n%s", got, want)
+	one := r.lastSent()
+	wantContains(t, "одиночная цель", one,
+		"выкачен",
+		"release-20260805-130115-1a2b3c4",
+		"была <code>release-20260804-221407-9f8e7d6</code>",
+		"<b>Изменения</b>")
+	if strings.Contains(one, "обновлён") {
+		t.Errorf("осталась прежняя одиночная форма:\n%s", one)
+	}
+
+	// Вторая цель того же прогона: строение сообщения не меняется, к нему лишь
+	// добавляется строка.
+	r.put(e2eStart+1, "metro", evSuccess, e2eRunA, 2, nil)
+	if err := r.tick(); err != nil {
+		t.Fatalf("такт не прошёл: %v", err)
+	}
+	two := r.lastEdit()
+	wantContains(t, "две цели", two, "выкачен", "<b>Изменения</b>")
+	if strings.Count(two, "выкачен") < 2 {
+		t.Errorf("вторая цель не попала в ту же карточку:\n%s", two)
 	}
 }
-
-// Неудачная правка → новое сообщение, а не потерянное уведомление (§6).
-//
-// Владелец удалил карточку прогона, Telegram отказал, сообщение слишком старое
-// — молчать тут недопустимо: цель выкачена, а в чате об этом не сказано.
 func TestE2EFailedEditFallsBackToNewMessage(t *testing.T) {
 	r := newE2E(t)
 	r.put(e2eStart, "chillhub-site", evSuccess, e2eRunA, 1, nil)
