@@ -26,6 +26,13 @@ type fakeTelegram struct {
 	nextID  int64
 	sendErr error
 	editErr error
+
+	// editCalls, editFailN и editFailErr нужны проверке повторов: она должна
+	// уметь провалить ПЕРВЫЕ N правок и посчитать, сколько их было всего.
+	// Нулевые значения ничего не меняют для остальных тестов.
+	editCalls   int
+	editFailN   int
+	editFailErr error
 }
 
 type fakeEdit struct {
@@ -47,6 +54,11 @@ func (f *fakeTelegram) SendGroup(_ context.Context, _ int64, text string, _ *Key
 func (f *fakeTelegram) EditLong(_ context.Context, _, messageID int64, text string, _ *Keyboard) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.editCalls++
+	if f.editFailN > 0 {
+		f.editFailN--
+		return f.editFailErr
+	}
 	if f.editErr != nil {
 		return f.editErr
 	}

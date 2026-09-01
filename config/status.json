@@ -345,5 +345,82 @@
         }
       ]
     }
-  ]
+  ],
+  "deployTargets": {
+    "chillhub-site": {
+      "project": "launcher",
+      "title": "Сайт",
+      "url": "https://launcher.samoy.love/"
+    },
+    "chillhub-api": {
+      "project": "launcher",
+      "title": "Публичный API",
+      "url": "https://launcher.samoy.love/api/version.json"
+    },
+    "chillhub-admin": {
+      "project": "launcher",
+      "title": "Админка",
+      "url": "https://launcher.samoy.love/admin/"
+    },
+    "chillhub-admin-ui": {
+      "project": "launcher",
+      "title": "Морда админки",
+      "url": "https://launcher.samoy.love/admin/"
+    },
+    "chillhub-installer": {
+      "project": "launcher",
+      "title": "Установщик",
+      "url": "https://launcher.samoy.love/#download"
+    },
+    "snakes": {
+      "project": "snakes",
+      "title": "Сервер и клиент"
+    },
+    "die": {
+      "project": "die",
+      "title": "Игра"
+    },
+    "metro": {
+      "project": "metro",
+      "title": "Сайт"
+    },
+    "metro-editor": {
+      "project": "metro",
+      "title": "Редактор"
+    },
+    "samoylove": {
+      "project": "samoylove",
+      "title": "Сайт"
+    },
+    "metrics": {
+      "project": "metrics",
+      "title": "Стек мониторинга"
+    },
+    "status-site": {
+      "project": "status",
+      "title": "Страница"
+    },
+    "status-agent": {
+      "project": "status",
+      "title": "Агент"
+    },
+    "samoylove-bot": {
+      "project": "status",
+      "title": "Бот"
+    },
+    "splitscreen-hub": {
+      "project": "samoylove",
+      "title": "SplitScreen Hub · приложение",
+      "url": "https://samoy.love/splitscreen-hub/"
+    },
+    "splitscreen-hub-data": {
+      "project": "samoylove",
+      "title": "SplitScreen Hub · данные",
+      "url": "https://samoy.love/splitscreen-hub/"
+    },
+    "deploy-kit": {
+      "project": "status",
+      "title": "Механика выкатки"
+    }
+  }
 }

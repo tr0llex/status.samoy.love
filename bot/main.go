@@ -697,6 +697,32 @@ func loadRegistry(summaryPath string) registry {
 		r.apps[p.ID] = [3]string{p.Title, p.URL, p.ID}
 		r.projects[p.ID] = p.Title
 	}
+	// ЯВНАЯ ТАБЛИЦА ЦЕЛЕЙ ВЫКАТКИ — ПОСЛЕДНЕЙ И ПОВЕРХ ВСЕГО.
+	//
+	// Всё выше выведено из проверок и проектов, а id цели выкатки совпадает с
+	// ними лишь по случайности: у метро и змеек совпал, у пяти целей лаунчера
+	// не совпал ни один. Такая цель показывалась своим id и без ссылки — в том
+	// числе в шапке карточки прогона, которая берёт имя у первой отчитавшейся
+	// цели. Отсюда в ленте и стояло «🚀 chillhub-api» вместо «Лаунчер».
+	//
+	// Таблица объявлена в config/status.json и доехала сюда через агента.
+	// Поверх — потому что это не догадка, а прямое указание владельца.
+	for app, t := range s.DeployTargets {
+		if app == "" || t.Title == "" {
+			continue
+		}
+		title := t.Title
+		if pt, ok := r.projects[t.Project]; ok && pt != "" && pt != t.Title {
+			title = pt + " · " + t.Title
+		}
+		url := t.URL
+		if url == "" {
+			if v, ok := r.apps[t.Project]; ok {
+				url = v[1]
+			}
+		}
+		r.apps[app] = [3]string{title, url, t.Project}
+	}
 	return r
 }
 

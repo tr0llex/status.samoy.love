@@ -24,6 +24,14 @@ type Summary struct {
 	Overall   string     `json:"overall"`
 	Projects  []Project  `json:"projects"`
 	Incidents []Incident `json:"incidents"`
+	// DeployTargets — как называть цели выкатки: id из события → имя, адрес и
+	// проект. Заводится в config/status.json и переносится агентом как есть.
+	//
+	// Без неё цель показывалась своим id: реестр собирался из проверок и
+	// проектов, а id цели выкатки совпадает с ними лишь по случайности. У
+	// целей лаунчера не совпадал ни один, и в ленте стояло «chillhub-api» без
+	// ссылки — в том числе в шапке карточки прогона.
+	DeployTargets map[string]DeployTarget `json:"deployTargets,omitempty"`
 }
 
 type Project struct {
@@ -172,4 +180,12 @@ func parseTime(s string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return t.UTC(), true
+}
+
+// DeployTarget — строка таблицы имён целей выкатки. Смысл полей — там же, где
+// она заводится: agent/main.go.
+type DeployTarget struct {
+	Project string `json:"project"`
+	Title   string `json:"title"`
+	URL     string `json:"url,omitempty"`
 }

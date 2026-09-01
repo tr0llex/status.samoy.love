@@ -885,6 +885,15 @@ func deployName(d Deploy) string {
 // Пустая строка — законный ответ: started служебный и в чат не идёт, а
 // незнакомый вид показывать нечем. Отправитель обязан такое сообщение
 // пропустить, а не слать пустое.
+// ВНИМАНИЕ: НА ПУТИ СООБЩЕНИЯ ЭТОЙ ФУНКЦИИ БОЛЬШЕ НЕТ.
+//
+// Она рисовала «прежнюю форму» для прогона из одной цели, и именно из-за неё
+// один и тот же факт получал две вёрстки: карточку у прогона из двух целей и
+// вот это — у прогона из одной. Развилку убрали, формат теперь один
+// (formatDeployGroup), и вызывающих у formatDeploy в рабочем коде не осталось.
+//
+// Живёт она пока только ради своих же тестов. Править ЗДЕСЬ, ожидая увидеть
+// правку в чате, бессмысленно: сообщение собирает formatDeployGroup.
 func formatDeploy(d Deploy) string {
 	d = sanitizeDeploy(d)
 	name := link(deployName(d), d.URL)
@@ -961,39 +970,47 @@ func runTail(d Deploy) string {
 // project — заголовок прогона: имя проекта, а не первой попавшейся цели.
 func formatDeployGroup(project string, ds []Deploy) string {
 	targets := deployOutcomes(ds)
-	switch len(targets) {
-	case 0:
+	if len(targets) == 0 {
 		return ""
-	case 1:
-		// Прогон из одной цели — большинство хозяйства. Он обязан дать РОВНО
-		// прежнюю карточку: ни списка целей, ни следов группировки.
-		return formatDeploy(targets[0])
+	}
+	// Прогон, о котором нечего сказать: одни «выкатывается…». Сообщение без
+	// исхода — это сообщение ни о чём (контракт, §4, §12).
+	if !runHasOutcome(targets) {
+		return ""
 	}
 
-	head := esc(sanitizeText(cutRunes(project, deployTitleMax)))
-	if head == "" {
-		head = esc(targets[0].App)
+	// ОДНА ВЁРСТКА НА ВСЕ РЕЛИЗЫ, СКОЛЬКО БЫ ЦЕЛЕЙ В ПРОГОНЕ НИ БЫЛО.
+	//
+	// Здесь стояла развилка: одна цель — «🚀 X обновлён» с версией отдельной
+	// строкой, две и больше — карточка со списком. Один и тот же факт получал
+	// две разные шапки, разное место версии, разную подпись времени и разный
+	// текст ссылки на админку — а какую из двух увидит читатель, решало число
+	// целей в прогоне, то есть обстоятельство, к сути релиза отношения не
+	// имеющее. Читать такую ленту нельзя: глаз каждый раз заново ищет, где
+	//version, где время и что вообще произошло.
+	rawHead := sanitizeText(cutRunes(project, deployTitleMax))
+	if rawHead == "" {
+		rawHead = deployName(targets[0])
 	}
+	head := esc(rawHead)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s <b>%s</b>", iconShip, head)
-	// ВЕРСИЯ В ШАПКЕ — ТОЛЬКО ЕСЛИ ОНА ОДНА НА ВЕСЬ ПРОГОН.
+	// В ШАПКЕ — КОММИТ, А НЕ ВЕРСИЯ.
 	//
-	// Здесь стояла версия ПЕРВОЙ отчитавшейся цели, и она приклеивалась ко
-	// всем остальным. У целей одного прогона версии разные: метку
-	// release-<дата>-<время>-<sha> каждая задача считает сама, и совпадает в
-	// них только sha. Карточка chillhub от 22.08 объявляла пять целей под
-	// версией одной из них, хотя настоящие были …-105949, …-110126, …-110316
-	// и 1.5.29.
+	// Версия у каждой цели своя: метку release-<дата>-<время>-<sha> каждая
+	// задача считает сама, и совпадает в них только sha. Карточка chillhub от
+	// 22.08 объявляла пять целей под версией одной из них, хотя настоящие были
+	// …-105949, …-110126, …-110316 и 1.5.29. Общее у прогона — КОММИТ: пуш
+	// один. Версии ушли в строки целей, где каждая своя и где она нужна для
+	// `dk rollback`.
 	//
-	// Общее у прогона — КОММИТ: пуш один. Его и показываем, когда версии
-	// разошлись, а сами версии уходят в строки целей, где каждая своя.
-	// Совпали (одна цель, или все посчитали одну секунду) — шапка прежняя.
-	sameVer := sameRunVersion(targets)
-	if v, commit := runVersion(targets); v != "" && sameVer {
-		b.WriteString(" · " + versionHTML(v, commit))
-	} else if c := runCommitHTML(targets); c != "" {
+	// Коммита нет (цель-файл со своей схемой версий, релиз до появления поля) —
+	// показываем версию: пустая шапка хуже неточной.
+	if c := runCommitHTML(targets); c != "" {
 		b.WriteString(" · " + c)
+	} else if v, commit := runVersion(targets); v != "" {
+		b.WriteString(" · " + versionHTML(v, commit))
 	}
 	b.WriteString("\n")
 
@@ -1003,39 +1020,54 @@ func formatDeployGroup(project string, ds []Deploy) string {
 		shown = shown[:deployTargets]
 	}
 	for _, t := range shown {
-		fmt.Fprintf(&b, "\n%s %s — %s", outcomeIcon(t), link(deployName(t), t.URL), outcomeText(t))
-		// Версия цели — здесь, если шапка её не показала: иначе прогон из пяти
-		// целей не сказал бы про четыре из них, какой релиз на них уехал, — а
-		// именно это имя нужно для `dk rollback`.
-		if !sameVer && t.Version != "" {
+		fmt.Fprintf(&b, "\n%s %s — %s", outcomeIcon(t), link(cardTargetName(rawHead, t), t.URL), outcomeText(t))
+		if t.Version != "" {
 			b.WriteString(" · <code>" + esc(t.Version) + "</code>")
 		}
 	}
 	if rest > 0 {
 		fmt.Fprintf(&b, "\n…и ещё %d %s", rest, pluralTargets(rest))
 	}
-	// Та же ссылка, что и в одиночном сообщении (см. deployAdminLinks) — цель
-	// не перестаёт ждать ручного переключения только потому, что приехала в
-	// одном прогоне с пятью другими.
+	// Ссылка на ручное действие: цель не перестаёт ждать переключения в
+	// админке оттого, что приехала в одном прогоне с пятью другими.
 	for _, t := range shown {
 		if t.Kind != deploySuccess {
 			continue
 		}
 		if url := deployAdminLinks[t.App]; url != "" {
-			fmt.Fprintf(&b, "\n👉 <a href=\"%s\">переключить %s в админке</a>", esc(url), esc(deployName(t)))
+			fmt.Fprintf(&b, "\n👉 <a href=\"%s\">переключить %s в админке</a>", esc(url), esc(cardTargetName(rawHead, t)))
 		}
 	}
 
-	if at := latestAt(targets); !at.IsZero() {
+	// АДРЕС ПРОГОНА — ТОЛЬКО У ПРОВАЛА, И ЭТО НЕ ЭКОНОМИЯ МЕСТА.
+	//
+	// У удачной выкатки идти в прогон незачем: всё, что о ней стоит знать,
+	// уже в карточке. У провала наоборот: стадия называет, ГДЕ встало, а лог
+	// прогона — единственное место, где написано, почему. Раньше эта ссылка
+	// была только в одиночном сообщении и пропадала, стоило прогону выкатить
+	// вторую цель.
+	if runHasFailure(targets) {
+		if r := runLinkHTML(runURLOf(targets)); r != "" {
+			b.WriteString("\n" + r)
+		}
+	}
+
+	// «Была …» — то, с чего ушли. Знает это только событие сервера: пайплайну
+	// неоткуда узнать, на что показывал симлинк до переключения.
+	if prev := runPrevious(targets); prev != "" {
+		b.WriteString("\n\nбыла <code>" + esc(prev) + "</code>")
+		if at := latestAt(targets); !at.IsZero() {
+			b.WriteString("\n<i>" + fmtTime(at) + "</i>")
+		}
+	} else if at := latestAt(targets); !at.IsZero() {
 		b.WriteString("\n\n<i>" + fmtTime(at) + "</i>")
 	}
-	// Список изменений — ОДИН РАЗ на прогон и последним блоком, ровно как в
-	// сообщении об одной цели.
-	// Хвост со списком изменений — только если в прогоне что-то ВЫКАТИЛОСЬ.
+
+	// Список изменений — ОДИН РАЗ на прогон и последним блоком.
 	//
-	// Строка «изменений в этом релизе нет» описывает релиз, а у прогона, где
-	// все цели провалились, релиза не было вовсе: там она читалась бы как
-	// «выкатили пустоту», хотя не выкатили ничего.
+	// Хвост со списком — только если в прогоне что-то ВЫКАТИЛОСЬ: строка
+	// «изменений в этом релизе нет» описывает релиз, а у прогона, где все цели
+	// провалились, релиза не было вовсе.
 	if runHasSuccess(targets) {
 		prev, commitURL := runCompare(targets)
 		b.WriteString(changelogTail(runChangelog(targets), runRepoURL(targets), prev, commitURL))
@@ -1043,6 +1075,31 @@ func formatDeployGroup(project string, ds []Deploy) string {
 		b.WriteString("\n\n" + cl)
 	}
 	return b.String()
+}
+
+// runHasOutcome — объявила ли хоть одна цель прогона свой исход.
+func runHasOutcome(ds []Deploy) bool {
+	for _, d := range ds {
+		if d.Kind != deployStarted {
+			return true
+		}
+	}
+	return false
+}
+
+// runPrevious — релиз, с которого ушёл прогон. Первый непустой: у целей одного
+// прогона он свой, а строка в карточке одна, и относится она к той цели, ради
+// которой карточку читают (deployOutcomes ставит прод первым).
+func runPrevious(ds []Deploy) string {
+	for _, d := range ds {
+		if d.Kind == deployRollback {
+			continue
+		}
+		if d.Previous != "" {
+			return d.Previous
+		}
+	}
+	return ""
 }
 
 // deployOutcomes — текущий исход каждой цели прогона.
@@ -1132,27 +1189,6 @@ func runVersion(ds []Deploy) (version, commitURL string) {
 		return d.Version, d.CommitURL
 	}
 	return "", ""
-}
-
-// sameRunVersion — одна ли версия у всех целей прогона.
-//
-// Откат в счёт не идёт: у него Version — это релиз, НА который вернулись
-// (контракт, §4), и сравнивать его с выкатываемыми версиями нечего.
-func sameRunVersion(ds []Deploy) bool {
-	first := ""
-	for _, d := range ds {
-		if d.Kind == deployRollback || d.Version == "" {
-			continue
-		}
-		if first == "" {
-			first = d.Version
-			continue
-		}
-		if d.Version != first {
-			return false
-		}
-	}
-	return true
 }
 
 // runCommitHTML — коммит прогона ссылкой и коротким sha.
@@ -1936,4 +1972,44 @@ func runHasSuccess(ds []Deploy) bool {
 		}
 	}
 	return false
+}
+
+// runHasFailure — провалилась ли в прогоне хоть одна цель.
+func runHasFailure(ds []Deploy) bool {
+	for _, d := range ds {
+		switch d.Kind {
+		case deployFailure, deployRolledBack:
+			return true
+		}
+	}
+	return false
+}
+
+// runURLOf — адрес прогона. Он один на все цели (один пуш — один прогон),
+// поэтому годится первый непустой.
+func runURLOf(ds []Deploy) string {
+	for _, d := range ds {
+		if d.RunURL != "" {
+			return d.RunURL
+		}
+	}
+	return ""
+}
+
+// cardTargetName — как назвать цель ВНУТРИ карточки.
+//
+// Реестр отдаёт полное имя, «Лаунчер · Публичный API»: оно верное там, где
+// цель стоит сама по себе. В карточке проект уже написан в шапке, и полное
+// имя превращало каждую строку в повтор — «Лаунчер» в шапке и следом пять
+// строк, начинающихся с того же слова.
+//
+// Срезается ТОЛЬКО совпадающий префикс и только если после него что-то
+// осталось: у цели, названной именем проекта («Метро»), срезать нечего, и
+// пустая строка вместо имени была бы хуже повтора.
+func cardTargetName(head string, d Deploy) string {
+	name := deployName(d)
+	if p := head + " · "; strings.HasPrefix(name, p) && len(name) > len(p) {
+		return name[len(p):]
+	}
+	return name
 }
