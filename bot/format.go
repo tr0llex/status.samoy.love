@@ -885,6 +885,15 @@ func deployName(d Deploy) string {
 // Пустая строка — законный ответ: started служебный и в чат не идёт, а
 // незнакомый вид показывать нечем. Отправитель обязан такое сообщение
 // пропустить, а не слать пустое.
+// ВНИМАНИЕ: НА ПУТИ СООБЩЕНИЯ ЭТОЙ ФУНКЦИИ БОЛЬШЕ НЕТ.
+//
+// Она рисовала «прежнюю форму» для прогона из одной цели, и именно из-за неё
+// один и тот же факт получал две вёрстки: карточку у прогона из двух целей и
+// вот это — у прогона из одной. Развилку убрали, формат теперь один
+// (formatDeployGroup), и вызывающих у formatDeploy в рабочем коде не осталось.
+//
+// Живёт она пока только ради своих же тестов. Править ЗДЕСЬ, ожидая увидеть
+// правку в чате, бессмысленно: сообщение собирает formatDeployGroup.
 func formatDeploy(d Deploy) string {
 	d = sanitizeDeploy(d)
 	name := link(deployName(d), d.URL)
@@ -1180,27 +1189,6 @@ func runVersion(ds []Deploy) (version, commitURL string) {
 		return d.Version, d.CommitURL
 	}
 	return "", ""
-}
-
-// sameRunVersion — одна ли версия у всех целей прогона.
-//
-// Откат в счёт не идёт: у него Version — это релиз, НА который вернулись
-// (контракт, §4), и сравнивать его с выкатываемыми версиями нечего.
-func sameRunVersion(ds []Deploy) bool {
-	first := ""
-	for _, d := range ds {
-		if d.Kind == deployRollback || d.Version == "" {
-			continue
-		}
-		if first == "" {
-			first = d.Version
-			continue
-		}
-		if d.Version != first {
-			return false
-		}
-	}
-	return true
 }
 
 // runCommitHTML — коммит прогона ссылкой и коротким sha.
