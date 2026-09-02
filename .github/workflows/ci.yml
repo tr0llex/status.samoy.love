@@ -291,3 +291,10 @@ jobs:
           # прогоне — защита её ещё не видела. Имя вычитается из «лишних».
           SELF_JOB_NAME: Защита ветки соответствует задачам CI
         run: bash ci/branch-protection-check.sh
+
+  # Топология боевого контура публичному репозиторию не нужна: проверка
+  # ловит её в добавленных строках, в сообщениях коммитов и в описании PR.
+  # Шаблоны и разбор — в deploy-kit, ci/infra-hygiene.sh.
+  infra:
+    name: Гигиена инфраструктуры
+    uses: samoy-love/deploy-kit/.github/workflows/infra-hygiene.yml@main
