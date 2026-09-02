@@ -2,8 +2,8 @@
 
 [Русский](README.md) · English
 
-[![CI](https://github.com/tr0llex/status.samoy.love/actions/workflows/ci.yml/badge.svg)](https://github.com/tr0llex/status.samoy.love/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/tr0llex/status.samoy.love/branch/main/graph/badge.svg)](https://codecov.io/gh/tr0llex/status.samoy.love)
+[![CI](https://github.com/samoy-love/status.samoy.love/actions/workflows/ci.yml/badge.svg)](https://github.com/samoy-love/status.samoy.love/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/samoy-love/status.samoy.love/branch/main/graph/badge.svg)](https://codecov.io/gh/samoy-love/status.samoy.love)
 [![prod](https://img.shields.io/website?url=https%3A%2F%2Fstatus.samoy.love&up_message=online&up_color=2ea043&down_message=offline&label=status.samoy.love)](https://status.samoy.love)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -45,7 +45,7 @@ the central decision of this repository.** An agent on a downed host cannot
 report that the host is down: the services take the page, the bot and the probe
 loop with them. So the same endpoints are walked in parallel by the `probe`
 workflow (`scripts/probe.mjs`). Its history is committed to a separate
-[`status-data`](https://github.com/tr0llex/status.samoy.love/tree/status-data)
+[`status-data`](https://github.com/samoy-love/status.samoy.love/tree/status-data)
 branch: a commit per pass would bury the actual code changes in `main`.
 
 **The frequency of that walk is not promised, it is displayed.** The schedule
@@ -218,7 +218,7 @@ dk deploy samoylove-bot     # the bot
 dk rollback status-agent    # roll back
 ```
 
-The mechanism itself lives in [deploy-kit](https://github.com/tr0llex/deploy-kit),
+The mechanism itself lives in [deploy-kit](https://github.com/samoy-love/deploy-kit),
 nginx configuration included. This repository has no deployment scripts of its
 own.
 
@@ -227,15 +227,15 @@ own.
 Not a pile of side projects but one system: one domain, one server, one release
 pipeline, one status page, one monitoring stack.
 
-| Project                                                             | What it is                                                | Code                                                                |
-| ------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------- |
-| [samoy.love](https://samoy.love)                                    | personal homepage and showcase                            | [samoy.love](https://github.com/tr0llex/samoy.love)                 |
-| [launcher.samoy.love](https://launcher.samoy.love)                  | ChillHub — a Windows game launcher with diff updates      | [chillhub](https://github.com/tr0llex/chillhub)                     |
-| [snakes.samoy.love](https://snakes.samoy.love)                      | multiplayer territory capture, binary WebSocket protocol  | [snakes](https://github.com/tr0llex/snakes)                         |
-| [metro.samoy.love](https://metro.samoy.love)                        | offline PWA of the Moscow metro map                       | [metro-map](https://github.com/tr0llex/metro-map)                   |
-| [status.samoy.love](https://status.samoy.love)                      | service status: uptime, versions, incidents               | [status.samoy.love](https://github.com/tr0llex/status.samoy.love)   |
-| [metrics.samoy.love](https://github.com/tr0llex/metrics.samoy.love) | monitoring and traffic stats without third-party trackers | [metrics.samoy.love](https://github.com/tr0llex/metrics.samoy.love) |
-| —                                                                   | the shared release pipeline                               | [deploy-kit](https://github.com/tr0llex/deploy-kit)                 |
+| Project                                                                | What it is                                                | Code                                                                   |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [samoy.love](https://samoy.love)                                       | personal homepage and showcase                            | [samoy.love](https://github.com/samoy-love/samoy.love)                 |
+| [launcher.samoy.love](https://launcher.samoy.love)                     | ChillHub — a Windows game launcher with diff updates      | [chillhub](https://github.com/samoy-love/chillhub)                     |
+| [snakes.samoy.love](https://snakes.samoy.love)                         | multiplayer territory capture, binary WebSocket protocol  | [snakes](https://github.com/samoy-love/snakes)                         |
+| [metro.samoy.love](https://metro.samoy.love)                           | offline PWA of the Moscow metro map                       | [metro-map](https://github.com/samoy-love/metro-map)                   |
+| [status.samoy.love](https://status.samoy.love)                         | service status: uptime, versions, incidents               | [status.samoy.love](https://github.com/samoy-love/status.samoy.love)   |
+| [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) | monitoring and traffic stats without third-party trackers | [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) |
+| —                                                                      | the shared release pipeline                               | [deploy-kit](https://github.com/samoy-love/deploy-kit)                 |
 
 The split with the monitoring next door is simple: the status page looks
 outward, for visitors; monitoring looks inward, for the owner. The agent here

@@ -3,7 +3,7 @@
 Откуда берётся блок «Изменения» под сообщением о релизе и что показывает
 `/changelog`. Путь длинный и проходит через два репозитория, поэтому описан
 целиком в одном месте: половина его живёт в
-[deploy-kit](https://github.com/tr0llex/deploy-kit), половина здесь, и чинить
+[deploy-kit](https://github.com/samoy-love/deploy-kit), половина здесь, и чинить
 это, читая по половине, невозможно.
 
 Короткая версия: **список составляет выкатка, а не агент и не бот.** Ни агент,
@@ -45,7 +45,7 @@ flowchart TB
 
 Собирает `deploy-kit/bin/changelog` — один скрипт на все три пути выкатки
 (`bin/deploy`, `go-service.yml`, `static-site.yml`). Подробности и все
-аргументы — в [README deploy-kit](https://github.com/tr0llex/deploy-kit#список-изменений);
+аргументы — в [README deploy-kit](https://github.com/samoy-love/deploy-kit#список-изменений);
 здесь важно следующее.
 
 **Диапазон** выбирается сверху вниз, первый сработавший выигрывает: явно
@@ -70,7 +70,7 @@ flowchart TB
 
 ```html
 • Завести dependabot одинаково во всех репозиториях
-<a href="https://github.com/tr0llex/deploy-kit/pull/21">#21</a>
+<a href="https://github.com/samoy-love/deploy-kit/pull/21">#21</a>
 ```
 
 Читатель видит те же `#21`, но по ним можно уйти в обсуждение. Адрес — всегда
@@ -135,7 +135,7 @@ UTF-16, которых у кириллицы столько же, сколько
     "version": "release-20260803-120000-1a2b3c4",
     "commit": "1a2b3c4",
     "builtAt": "2026-08-03T12:00:00+03:00",
-    "changelog": "<b>Изменения</b>\n• исправить падение на пустом конфиге\n• обновить nginx до 1.24 <a href=\"https://github.com/tr0llex/deploy-kit/pull/21\">#21</a>"
+    "changelog": "<b>Изменения</b>\n• исправить падение на пустом конфиге\n• обновить nginx до 1.24 <a href=\"https://github.com/samoy-love/deploy-kit/pull/21\">#21</a>"
 }
 ```
 
