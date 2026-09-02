@@ -2,8 +2,8 @@
 
 Русский · [English](README.en.md)
 
-[![CI](https://github.com/tr0llex/status.samoy.love/actions/workflows/ci.yml/badge.svg)](https://github.com/tr0llex/status.samoy.love/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/tr0llex/status.samoy.love/branch/main/graph/badge.svg)](https://codecov.io/gh/tr0llex/status.samoy.love)
+[![CI](https://github.com/samoy-love/status.samoy.love/actions/workflows/ci.yml/badge.svg)](https://github.com/samoy-love/status.samoy.love/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/samoy-love/status.samoy.love/branch/main/graph/badge.svg)](https://codecov.io/gh/samoy-love/status.samoy.love)
 [![прод](https://img.shields.io/website?url=https%3A%2F%2Fstatus.samoy.love&up_message=online&up_color=2ea043&down_message=offline&label=status.samoy.love)](https://status.samoy.love)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -44,7 +44,7 @@ flowchart LR
 вместе с сервисами исчезают и страница, и бот, и сам обход. Поэтому те же
 эндпоинты параллельно обходит воркфлоу `probe` (`scripts/probe.mjs`). Историю
 он коммитит в отдельную ветку
-[`status-data`](https://github.com/tr0llex/status.samoy.love/tree/status-data):
+[`status-data`](https://github.com/samoy-love/status.samoy.love/tree/status-data):
 коммит на каждый обход в `main` похоронил бы правки кода.
 
 **Частота этого обхода не обещается, а показывается.** Расписание просит
@@ -206,7 +206,7 @@ dk deploy samoylove-bot     # бот
 dk rollback status-agent    # откатить
 ```
 
-Сама механика живёт в [deploy-kit](https://github.com/tr0llex/deploy-kit),
+Сама механика живёт в [deploy-kit](https://github.com/samoy-love/deploy-kit),
 там же конфигурация nginx. Своих скриптов деплоя в этом репозитории нет.
 
 ## Часть samoy.love
@@ -216,13 +216,13 @@ dk rollback status-agent    # откатить
 
 | Проект                                                              | Что это                                                       | Код                                                                 |
 | ------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [samoy.love](https://samoy.love)                                    | личная страница и витрина                                     | [samoy.love](https://github.com/tr0llex/samoy.love)                 |
-| [launcher.samoy.love](https://launcher.samoy.love)                  | ChillHub — лаунчер игр для Windows с обновлениями по диффу    | [chillhub](https://github.com/tr0llex/chillhub)                     |
-| [snakes.samoy.love](https://snakes.samoy.love)                      | мультиплеерный захват территории, бинарный WebSocket-протокол | [snakes](https://github.com/tr0llex/snakes)                         |
-| [metro.samoy.love](https://metro.samoy.love)                        | офлайн-PWA со схемой московского метро                        | [metro-map](https://github.com/tr0llex/metro-map)                   |
-| [status.samoy.love](https://status.samoy.love)                      | состояние сервисов: аптайм, версии, инциденты                 | [status.samoy.love](https://github.com/tr0llex/status.samoy.love)   |
-| [metrics.samoy.love](https://github.com/tr0llex/metrics.samoy.love) | мониторинг и посещаемость без трекеров                        | [metrics.samoy.love](https://github.com/tr0llex/metrics.samoy.love) |
-| —                                                                   | общий релизный пайплайн                                       | [deploy-kit](https://github.com/tr0llex/deploy-kit)                 |
+| [samoy.love](https://samoy.love)                                    | личная страница и витрина                                     | [samoy.love](https://github.com/samoy-love/samoy.love)                 |
+| [launcher.samoy.love](https://launcher.samoy.love)                  | ChillHub — лаунчер игр для Windows с обновлениями по диффу    | [chillhub](https://github.com/samoy-love/chillhub)                     |
+| [snakes.samoy.love](https://snakes.samoy.love)                      | мультиплеерный захват территории, бинарный WebSocket-протокол | [snakes](https://github.com/samoy-love/snakes)                         |
+| [metro.samoy.love](https://metro.samoy.love)                        | офлайн-PWA со схемой московского метро                        | [metro-map](https://github.com/samoy-love/metro-map)                   |
+| [status.samoy.love](https://status.samoy.love)                      | состояние сервисов: аптайм, версии, инциденты                 | [status.samoy.love](https://github.com/samoy-love/status.samoy.love)   |
+| [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) | мониторинг и посещаемость без трекеров                        | [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) |
+| —                                                                   | общий релизный пайплайн                                       | [deploy-kit](https://github.com/samoy-love/deploy-kit)                 |
 
 Разделение с соседним мониторингом простое: статус-страница смотрит наружу,
 для посетителей; мониторинг — внутрь, для владельца. Агент отсюда отдаёт туда

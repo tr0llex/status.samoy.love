@@ -5,7 +5,7 @@
 
 ## Выкатка
 
-Общим пайплайном [deploy-kit](https://github.com/tr0llex/deploy-kit). Три
+Общим пайплайном [deploy-kit](https://github.com/samoy-love/deploy-kit). Три
 независимые цели: страница, агент и бот. Правка страницы не перезапускает сбор
 метрик, обновление агента не ждёт пересборки статики, перезапуск бота не
 задевает ни то, ни другое.
@@ -146,7 +146,7 @@ sudo systemd-run --pipe --uid=samoylove-bot \
 событий, который пишет сама выкатка. Разница снимков существует не всегда:
 три выкатки за минуту дают одно сообщение, выкатка с откатом — ноль, провал
 выкатки — ноль (версия не менялась, сравнивать нечего), автооткат — ноль.
-Контракт журнала — [`docs/events.md`](https://github.com/tr0llex/deploy-kit/blob/main/docs/events.md)
+Контракт журнала — [`docs/events.md`](https://github.com/samoy-love/deploy-kit/blob/main/docs/events.md)
 в deploy-kit; форма сообщения о релизе при этом не изменилась.
 
 Каталог `/var/lib/deploy-kit/events` заводит `bin/install-server` из
