@@ -214,15 +214,15 @@ dk rollback status-agent    # откатить
 Не россыпь пет-проектов, а одна система: один домен, один сервер, один
 релизный пайплайн, одна статус-страница, один мониторинг.
 
-| Проект                                                              | Что это                                                       | Код                                                                 |
-| ------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [samoy.love](https://samoy.love)                                    | личная страница и витрина                                     | [samoy.love](https://github.com/samoy-love/samoy.love)                 |
-| [launcher.samoy.love](https://launcher.samoy.love)                  | ChillHub — лаунчер игр для Windows с обновлениями по диффу    | [chillhub](https://github.com/samoy-love/chillhub)                     |
-| [snakes.samoy.love](https://snakes.samoy.love)                      | мультиплеерный захват территории, бинарный WebSocket-протокол | [snakes](https://github.com/samoy-love/snakes)                         |
-| [metro.samoy.love](https://metro.samoy.love)                        | офлайн-PWA со схемой московского метро                        | [metro-map](https://github.com/samoy-love/metro-map)                   |
-| [status.samoy.love](https://status.samoy.love)                      | состояние сервисов: аптайм, версии, инциденты                 | [status.samoy.love](https://github.com/samoy-love/status.samoy.love)   |
+| Проект                                                                 | Что это                                                       | Код                                                                    |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [samoy.love](https://samoy.love)                                       | личная страница и витрина                                     | [samoy.love](https://github.com/samoy-love/samoy.love)                 |
+| [launcher.samoy.love](https://launcher.samoy.love)                     | ChillHub — лаунчер игр для Windows с обновлениями по диффу    | [chillhub](https://github.com/samoy-love/chillhub)                     |
+| [snakes.samoy.love](https://snakes.samoy.love)                         | мультиплеерный захват территории, бинарный WebSocket-протокол | [snakes](https://github.com/samoy-love/snakes)                         |
+| [metro.samoy.love](https://metro.samoy.love)                           | офлайн-PWA со схемой московского метро                        | [metro-map](https://github.com/samoy-love/metro-map)                   |
+| [status.samoy.love](https://status.samoy.love)                         | состояние сервисов: аптайм, версии, инциденты                 | [status.samoy.love](https://github.com/samoy-love/status.samoy.love)   |
 | [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) | мониторинг и посещаемость без трекеров                        | [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) |
-| —                                                                   | общий релизный пайплайн                                       | [deploy-kit](https://github.com/samoy-love/deploy-kit)                 |
+| —                                                                      | общий релизный пайплайн                                       | [deploy-kit](https://github.com/samoy-love/deploy-kit)                 |
 
 Разделение с соседним мониторингом простое: статус-страница смотрит наружу,
 для посетителей; мониторинг — внутрь, для владельца. Агент отсюда отдаёт туда

@@ -227,15 +227,15 @@ own.
 Not a pile of side projects but one system: one domain, one server, one release
 pipeline, one status page, one monitoring stack.
 
-| Project                                                             | What it is                                                | Code                                                                |
-| ------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------- |
-| [samoy.love](https://samoy.love)                                    | personal homepage and showcase                            | [samoy.love](https://github.com/samoy-love/samoy.love)                 |
-| [launcher.samoy.love](https://launcher.samoy.love)                  | ChillHub — a Windows game launcher with diff updates      | [chillhub](https://github.com/samoy-love/chillhub)                     |
-| [snakes.samoy.love](https://snakes.samoy.love)                      | multiplayer territory capture, binary WebSocket protocol  | [snakes](https://github.com/samoy-love/snakes)                         |
-| [metro.samoy.love](https://metro.samoy.love)                        | offline PWA of the Moscow metro map                       | [metro-map](https://github.com/samoy-love/metro-map)                   |
-| [status.samoy.love](https://status.samoy.love)                      | service status: uptime, versions, incidents               | [status.samoy.love](https://github.com/samoy-love/status.samoy.love)   |
+| Project                                                                | What it is                                                | Code                                                                   |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [samoy.love](https://samoy.love)                                       | personal homepage and showcase                            | [samoy.love](https://github.com/samoy-love/samoy.love)                 |
+| [launcher.samoy.love](https://launcher.samoy.love)                     | ChillHub — a Windows game launcher with diff updates      | [chillhub](https://github.com/samoy-love/chillhub)                     |
+| [snakes.samoy.love](https://snakes.samoy.love)                         | multiplayer territory capture, binary WebSocket protocol  | [snakes](https://github.com/samoy-love/snakes)                         |
+| [metro.samoy.love](https://metro.samoy.love)                           | offline PWA of the Moscow metro map                       | [metro-map](https://github.com/samoy-love/metro-map)                   |
+| [status.samoy.love](https://status.samoy.love)                         | service status: uptime, versions, incidents               | [status.samoy.love](https://github.com/samoy-love/status.samoy.love)   |
 | [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) | monitoring and traffic stats without third-party trackers | [metrics.samoy.love](https://github.com/samoy-love/metrics.samoy.love) |
-| —                                                                   | the shared release pipeline                               | [deploy-kit](https://github.com/samoy-love/deploy-kit)                 |
+| —                                                                      | the shared release pipeline                               | [deploy-kit](https://github.com/samoy-love/deploy-kit)                 |
 
 The split with the monitoring next door is simple: the status page looks
 outward, for visitors; monitoring looks inward, for the owner. The agent here
