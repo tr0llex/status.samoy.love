@@ -177,7 +177,7 @@ jobs:
     if: >-
       (inputs.target == '' && needs.changes.outputs.site == 'true')
       || inputs.target == 'all' || inputs.target == 'site'
-    uses: tr0llex/deploy-kit/.github/workflows/static-site.yml@main
+    uses: samoy-love/deploy-kit/.github/workflows/static-site.yml@main
     with:
       config: .deploy-kit/site.env
       # nginx-conf не передаём: с «Чистки» (5908166) конфиг живёт в самом
@@ -194,7 +194,7 @@ jobs:
     if: >-
       (inputs.target == '' && needs.changes.outputs.agent == 'true')
       || inputs.target == 'all' || inputs.target == 'agent'
-    uses: tr0llex/deploy-kit/.github/workflows/go-service.yml@main
+    uses: samoy-love/deploy-kit/.github/workflows/go-service.yml@main
     with:
       config: .deploy-kit/agent.env
       workdir: agent
@@ -220,7 +220,7 @@ jobs:
       && (needs.agent.result == 'success' || needs.agent.result == 'skipped')
       && ((inputs.target == '' && needs.changes.outputs.bot == 'true')
           || inputs.target == 'all' || inputs.target == 'bot')
-    uses: tr0llex/deploy-kit/.github/workflows/go-service.yml@main
+    uses: samoy-love/deploy-kit/.github/workflows/go-service.yml@main
     with:
       config: .deploy-kit/bot.env
       workdir: bot
