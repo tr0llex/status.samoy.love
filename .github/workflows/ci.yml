@@ -30,7 +30,7 @@ jobs:
   # раньше, но он включается вручную и в клоне отсутствует — здесь страховка.
   commits:
     name: Коммиты без упоминаний ИИ
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,7 +57,7 @@ jobs:
 
   agent:
     name: Агент (Go)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -98,7 +98,7 @@ jobs:
 
   bot:
     name: Бот (Go)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -134,7 +134,7 @@ jobs:
 
   page:
     name: Страница
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -171,7 +171,7 @@ jobs:
   # появился только у сторожа, и заметить это можно было лишь глазами.
   conformance:
     name: Агент и сторож судят одинаково
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -186,7 +186,7 @@ jobs:
 
   e2e:
     name: Сквозные тесты
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 15
 
     # Проверка после выкатки смотрит на код ответа. Статус-страница отдаёт 200
@@ -249,7 +249,7 @@ jobs:
   # любую сторону — пропавшая проверка или новая незащищённая.
   protection-sync:
     name: Защита ветки соответствует задачам CI
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, home]
     timeout-minutes: 5
     # needs — не про очерёдность результата, а про то, что видит Jobs API.
     # GitHub регистрирует задачу с зависимостями в API прогона только когда
